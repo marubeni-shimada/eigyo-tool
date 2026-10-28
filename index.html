@@ -3,6 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>営業管理システム</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -358,7 +361,7 @@ select.scell{cursor:pointer}
       <button class="hamb" id="hamb" aria-label="メニュー"><svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
       <h1 id="topttl">ダッシュボード</h1><span class="crumb" id="topsub">営業全体の状況</span>
       <div class="search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="gsearch" placeholder="案件・顧客・担当を検索"></div>
-      <div class="usr"><div class="av" id="usrAv">営</div><div class="nm"><span id="usrName">営業部</span><small id="connLabel">読込中…</small><span class="lo" id="logoutBtn">ログアウト</span></div></div>
+      <div class="usr"><div class="av" id="usrAv">営</div><div class="nm"><span id="usrName">読込中…</span><small id="connLabel">読込中…</small><span class="lo" id="logoutBtn">ログアウト</span></div></div>
     </header>
     <main class="main" id="main">
       <div id="banner"></div>
@@ -493,8 +496,14 @@ var LINE_USERID = "", LINE_NAME = "", LINE_LINK_MODE = false, LIFF_PENDING = fal
    仮ログイン/ローカル(LIFF未設定)では制限しない＝開発用 */
 var ADMIN_LINE_IDS = ["U79713c8a39251a8e78d8d931bb006c17"];
 function isAdmin(){ if(!LIFF_ID) return true; return ADMIN_LINE_IDS.indexOf(LINE_USERID)>=0; }
-/* LINE運用時は、ロード直後からログイン画面を出さない（自動ログイン中はアプリを見せ、紐付けが必要な初回だけ後で表示） */
-try{ if(LIFF_ID){ LIFF_PENDING=true; var _lv0=document.getElementById("loginView"); if(_lv0) _lv0.style.display="none"; } }catch(e){}
+/* LINE運用時は、ロード直後に「LINEでログイン中…」のスピナーを表示（名前選択は出さない）。
+   自動ログイン完了でログイン画面ごと消える／紐付けが必要な初回だけ名前選択を出す。 */
+try{ if(LIFF_ID){ LIFF_PENDING=true;
+  var _ll=document.getElementById("loginLoading"); if(_ll) _ll.style.display="block";
+  ["loginSel","loginGo","loginCode"].forEach(function(id){ var e=document.getElementById(id); if(e) e.style.display="none"; });
+  var _p=document.querySelector("#loginView p"); if(_p) _p.style.display="none";
+  var _h=document.querySelector("#loginView .hint"); if(_h) _h.style.display="none";
+} }catch(e){}
 function gasCall(fn, args){
   return fetch(GAS_URL, {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body:JSON.stringify({fn:fn, args:args||[]})})
     .then(function(r){return r.json();})
@@ -547,16 +556,24 @@ function avatar(name){name=String(name||"").trim();return name?name.charAt(0):"�
 function toast(msg){var t=$("toast");t.textContent=msg;t.classList.add("on");clearTimeout(toast._t);toast._t=setTimeout(function(){t.classList.remove("on");},2200);}
 
 /* ===== 起動：GASからデータ取得（失敗時サンプル） ===== */
+/* 読み取りの自動リトライ（モバイルで一瞬失敗しても数回やり直す） */
+function gasRead(fn, tries){
+  tries=tries||1;
+  return gasCall(fn).catch(function(e){
+    if(tries<4){ return new Promise(function(res){ setTimeout(res, 900*tries); }).then(function(){ return gasRead(fn, tries+1); }); }
+    throw e;
+  });
+}
 function boot(){
   var membersOK=false;
   // ① 社員だけ先に軽く取得→ログインを速く・確実に（本体データの重さ/失敗に左右されない）
-  gasCall("getMembers").then(function(ms){
+  gasRead("getMembers").then(function(ms){
     if(ms){ DATA.members=ms; membersOK=true;
       try{ renderLogin(); applyLoginGate(); applyAdminGate(); if(LIFF_ID && !ME){ tryLiffLogin(); } }catch(e){}
     }
   }).catch(function(e){ console.warn("getMembers", e); });
   // ② 本体データ（日報・案件・顧客）
-  gasCall("getAllData").then(function(d){
+  gasRead("getAllData").then(function(d){
     DATA.customers=(d&&d.customers)||[];
     if(!membersOK) DATA.members=(d&&d.members)||[];
     DATA.anken=((d&&d.anken)||[]).map(adaptAnken);
@@ -1578,11 +1595,8 @@ function applyAdminGate(){
   if(!show){ var cur=document.querySelector('.view.on'); if(cur && cur.id==="v-admin"){ var d=document.querySelector('.rail .ri[data-v="dash"]'); if(d) d.click(); } }
 }
 function applyLoginGate(){
-  var lv=document.getElementById("loginView"); if(!lv) return;
-  // LINEで自動ログイン進行中（未紐付け判定前）は、ログイン画面を出さずアプリを見せる。
-  // 名前の紐付けが必要な初回だけログイン画面を出す。
-  var show = !ME && !(LIFF_ID && LIFF_PENDING && !LINE_LINK_MODE);
-  lv.style.display = show ? "flex" : "none";
+  // 未ログインの間はログイン画面(スピナー or 名前選択)を必ず被せる＝アプリの初期表示(営業部)を見せない
+  var lv=document.getElementById("loginView"); if(lv) lv.style.display = ME ? "none" : "flex";
 }
 function doLogout(){ ME=""; LINE_USERID=""; try{localStorage.removeItem(LS_LINEUID);}catch(e){} saveAdmin(); applyLoginGate(); renderLogin(); }
 /* LIFFログインの骨組み（LIFF_ID未設定なら何もしない＝仮ログインのまま）。
