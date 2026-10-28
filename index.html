@@ -1132,6 +1132,7 @@ function estimateHtml(){
 ["schedule","report","bi"].forEach(function(k){$("v-"+k).innerHTML=renderSoon(k);});
 $("v-estimate").innerHTML=estimateHtml();
 document.querySelectorAll(".rail .ri").forEach(function(n){n.onclick=function(){
+  if(n.dataset.v==="admin" && !isAdmin()){ try{toast("管理者のみ利用できます");}catch(e){} return; }
   document.querySelectorAll(".rail .ri").forEach(function(x){x.classList.remove("on");});
   n.classList.add("on");
   var v=n.dataset.v;
@@ -1483,7 +1484,7 @@ function applyDeepLink(){
   var ri=document.querySelector('.rail .ri[data-v="'+v+'"]'); if(ri) ri.click();
   if(v==="nippou"){ try{ openNippou(); }catch(e){} }
 }
-function afterLoginUi(){ try{ renderDash(); if($("calTarget")){ fillCalTarget(); if(calRoster().indexOf(ME)>=0) $("calTarget").value=ME; renderCalendar(); } applyAdminGate(); applyDeepLink(); }catch(e){} }
+function afterLoginUi(){ try{ applyAdminGate(); }catch(e){} try{ renderDash(); if($("calTarget")){ fillCalTarget(); if(calRoster().indexOf(ME)>=0) $("calTarget").value=ME; renderCalendar(); } applyDeepLink(); }catch(e){} }
 /* 管理者メニューの出し分け：管理者LINE IDのみ表示。非管理者が管理者画面にいたらダッシュへ戻す */
 function applyAdminGate(){
   var show=isAdmin();
