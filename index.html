@@ -565,25 +565,32 @@ function gasRead(fn, tries){
   });
 }
 function boot(){
-  var membersOK=false;
-  // ① 社員だけ先に軽く取得→ログインを速く・確実に（本体データの重さ/失敗に左右されない）
+  var membersOK=false, coreOK=false;
+  // ① 社員だけ先に軽く取得→ログインを速く・確実に
   gasRead("getMembers").then(function(ms){
     if(ms){ DATA.members=ms; membersOK=true;
       try{ renderLogin(); applyLoginGate(); applyAdminGate(); if(LIFF_ID && !ME){ tryLiffLogin(); } }catch(e){}
     }
   }).catch(function(e){ console.warn("getMembers", e); });
-  // ② 本体データ（日報・案件・顧客）
-  gasRead("getAllData").then(function(d){
-    DATA.customers=(d&&d.customers)||[];
-    if(!membersOK) DATA.members=(d&&d.members)||[];
-    DATA.anken=((d&&d.anken)||[]).map(adaptAnken);
-    DATA.reports=((d&&d.reports)||[]).map(adaptReport);
+  // ② 案件（軽い）→ 日報を待たずに案件タブを表示
+  gasRead("getCore").then(function(c){
+    coreOK=true;
+    if(!membersOK && c && c.members){ DATA.members=c.members; }
+    DATA.anken=((c&&c.anken)||[]).map(adaptAnken);
+    DATA.customers=(c&&c.customers)||[];
     USING_SAMPLE=false; afterLoad("クラウド共有に接続");
-  }).catch(function(e){ console.warn("getAllData", e);
-    if(membersOK){ DATA.anken=DATA.anken||[]; DATA.reports=DATA.reports||[]; DATA.customers=DATA.customers||[]; afterLoad("接続（データ取得に失敗・再読み込みしてください）"); }
-    else { useSample("GASに接続できませんでした"); }
+  }).catch(function(e){ console.warn("getCore", e);
+    if(!membersOK){ useSample("GASに接続できませんでした"); }
+    else { DATA.anken=DATA.anken||[]; afterLoad("接続（案件の取得に失敗・再読み込み）"); }
   });
-  setTimeout(function(){ try{ var b=document.getElementById("banner"); if(b && !USING_SAMPLE && (!DATA.anken||!DATA.anken.length)) b.innerHTML='<div class="note">● 読み込み中…（日報が多いため少し時間がかかります）</div>'; }catch(e){} }, 7000);
+  // ③ 日報（重い）→ 後から取得して反映（失敗しても案件は表示済み）
+  gasRead("getReports").then(function(rs){
+    DATA.reports=((rs)||[]).map(adaptReport);
+    if(!USING_SAMPLE){ try{ afterLoad("クラウド共有に接続"); }catch(e){} }
+  }).catch(function(e){ console.warn("getReports", e);
+    try{ var b=document.getElementById("banner"); if(b && !USING_SAMPLE) b.innerHTML='<div class="note warn">● 日報の取得に失敗しました（案件は表示中）。再読み込みで取得します。</div>'; }catch(_){}
+  });
+  setTimeout(function(){ try{ var b=document.getElementById("banner"); if(b && !USING_SAMPLE && !coreOK) b.innerHTML='<div class="note">● 読み込み中…</div>'; }catch(e){} }, 7000);
 }
 function useSample(why){
   USING_SAMPLE=true;
