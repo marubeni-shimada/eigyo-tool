@@ -666,13 +666,15 @@ function afterLoad(connMsg){
     }
     if(LIFF_ID && !ME){ LIFF_PENDING=true; }
     renderAdmin(); renderMe(); renderLogin(); applyLoginGate(); applyAdminGate();
-    if(LIFF_ID){ try{ tryLiffLogin(); }catch(e){} }
+    // 記憶済み(ME有)なら2回目以降はログイン処理をしない＝そのまま即アプリ（CraftBank同様）。未記憶の初回のみLIFF実行
+    if(LIFF_ID && !ME){ try{ tryLiffLogin(); }catch(e){} }
   }catch(e){ console.warn("admin init",e); }
   $("banner").innerHTML = USING_SAMPLE
     ? '<div class="note warn">● '+esc(connMsg)+'。保存はされません。実データで見るには、GASをウェブアプリとしてデプロイし、このファイルの GAS_URL を /exec に設定してください。</div>'
     : '<div class="note ok">● クラウド共有に接続中。日報・案件の追加／編集／削除は、スプレッドシート（全社共有）にそのまま反映されます。</div>';
   buildFilters();
   renderDash(); renderAnken(); renderNippou(); renderCustomer(); fillStatusSelect(); fillCustList(); fillAnkenSiteList(); fillCalTarget(); renderCalendar();
+  if(ME){ try{ afterLoginUi(); }catch(e){} }   // 記憶済み：ログイン画面を出さず各種デフォルト(自分の日報/カレンダー/管理者判定)を適用
 }
 function buildFilters(){
   // 担当プルダウンは「社員」シート（MEMBERS）から取る（日報・案件データからは取らない＝会社名混入を防ぐ）
@@ -1334,16 +1336,17 @@ function exportAnken(){
 }
 
 /* ===== 管理者：社員マスタ／ログイン（仮）／通知先 ===== */
-var LS_MEM="eigyo_members", LS_ME="eigyo_me", LS_NOTI="eigyo_noti";
+var LS_MEM="eigyo_members", LS_ME="eigyo_me", LS_NOTI="eigyo_noti", LS_LINEUID="eigyo_lineuid";
 var MEMBERS=[], ME="", NOTI={on:true};
 function aesc(x){ return String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 function loadAdmin(){
   try{ MEMBERS=JSON.parse(localStorage.getItem(LS_MEM)||"null")||[]; }catch(e){ MEMBERS=[]; }
   try{ ME=localStorage.getItem(LS_ME)||""; }catch(e){ ME=""; }
+  try{ LINE_USERID=localStorage.getItem(LS_LINEUID)||LINE_USERID||""; }catch(e){}
   try{ NOTI=JSON.parse(localStorage.getItem(LS_NOTI)||"null")||{on:true}; }catch(e){ NOTI={on:true}; }
   if(!MEMBERS.length){ MEMBERS=seedMembers(); saveAdmin(); }
 }
-function saveAdmin(){ try{ localStorage.setItem(LS_MEM,JSON.stringify(MEMBERS)); localStorage.setItem(LS_ME,ME||""); localStorage.setItem(LS_NOTI,JSON.stringify(NOTI)); }catch(e){} }
+function saveAdmin(){ try{ localStorage.setItem(LS_MEM,JSON.stringify(MEMBERS)); localStorage.setItem(LS_ME,ME||""); localStorage.setItem(LS_LINEUID,LINE_USERID||""); localStorage.setItem(LS_NOTI,JSON.stringify(NOTI)); }catch(e){} }
 function seedMembers(){
   // 社員の取得元＝日報(REP=氏名)＋案件(営業担当者)の実在する名前を集約。新スキーマは正しく氏名が入る
   var seen={}, out=[];
@@ -1565,7 +1568,7 @@ function applyLoginGate(){
   var lv=document.getElementById("loginView");
   if(lv) lv.style.display = ME ? "none" : "flex";
 }
-function doLogout(){ ME=""; saveAdmin(); applyLoginGate(); renderLogin(); }
+function doLogout(){ ME=""; LINE_USERID=""; try{localStorage.removeItem(LS_LINEUID);}catch(e){} saveAdmin(); applyLoginGate(); renderLogin(); }
 /* LIFFログインの骨組み（LIFF_ID未設定なら何もしない＝仮ログインのまま）。
    LINEのuserIdを取得→社員シートのLINE_IDで突合して氏名を確定、無ければ表示名。 */
 function tryLiffLogin(){
