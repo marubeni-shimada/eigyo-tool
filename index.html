@@ -1414,19 +1414,16 @@ function renderAdmin(){
 /* ===== 仮ログイン＋スマホUI制御 ===== */
 function renderLogin(){
   var sel=document.getElementById("loginSel"); if(!sel) return;
-  // スプレッドシートの社員シートを最優先（登録があれば常にそれを使う＝localStorageの古い名簿で上書きしない）
+  // ログイン候補＝社員シートが唯一の正。空のときだけ日報の氏名からクリーンに作る。
+  // （案件の担当者名・ブラウザに残った古い名簿は使わない＝会社名などの混入を防ぐ）
   if(typeof DATA!=="undefined" && DATA.members && DATA.members.length){
     MEMBERS = DATA.members.map(function(m){ return {name:String(m["氏名"]||m.name||"").trim(), role:m["役割"]||m.role||"営業", line:m["LINE_ID"]||m.line||"", noti:!!(m["通知を受取"]||m.noti)}; }).filter(function(m){return m.name;});
-    try{saveAdmin();}catch(e){}
-  }
-  // それでも空なら、日報(氏名)＋案件(担当)から作る（社員シート未登録時のフォールバック）
-  if(!MEMBERS || !MEMBERS.length){
+  } else {
     var seen={}, list=[];
-    (typeof DATA!=="undefined"&&DATA.members||[]).forEach(function(m){ var n=String(m["氏名"]||m.name||"").trim(); if(n&&!seen[n]){seen[n]=1;list.push({name:n,role:m["役割"]||"営業",line:"",noti:/川井/.test(n)});} });
     (typeof REP!=="undefined"?REP:[]).forEach(function(r){ var n=String(r.rep||"").trim(); if(n&&!seen[n]){seen[n]=1;list.push({name:n,role:/川井/.test(n)?"部長":"営業",line:"",noti:/川井/.test(n)});} });
-    (typeof ANK!=="undefined"?ANK:[]).forEach(function(a){ var n=String(a.rep||"").trim(); if(n&&!seen[n]){seen[n]=1;list.push({name:n,role:"営業",line:"",noti:false});} });
-    if(list.length){ MEMBERS=list; try{saveAdmin();}catch(e){} }
+    MEMBERS=list;
   }
+  try{saveAdmin();}catch(e){}
   sel.innerHTML='<option value="">— 選んでください —</option>'+MEMBERS.map(function(m){return '<option'+(m.name===ME?' selected':'')+'>'+aesc(m.name)+'</option>';}).join("");
   var go=document.getElementById("loginGo");
   var p=document.querySelector("#loginView p"), hint=document.querySelector("#loginView .hint");
@@ -1456,7 +1453,22 @@ function renderLogin(){
   };
   go.disabled=!sel.value;
 }
-function afterLoginUi(){ try{ renderDash(); if($("calTarget")){ fillCalTarget(); if(calRoster().indexOf(ME)>=0) $("calTarget").value=ME; renderCalendar(); } }catch(e){} }
+/* リッチメニューのディープリンク：?go=nippou/kanban/calendar で開く画面を指定（日報は作成フォームも開く） */
+var _deepLinkDone=false;
+function getDeepLink(){
+  var q=""; try{ q=location.search||""; }catch(e){}
+  try{ if(typeof liff!=="undefined" && liff.state){ q = (String(liff.state).charAt(0)==="?"?liff.state:("?"+liff.state)); } }catch(e){}
+  var m=String(q).match(/[?&]go=([^&]+)/); return m?decodeURIComponent(m[1]):"";
+}
+function applyDeepLink(){
+  if(_deepLinkDone) return;
+  var go=getDeepLink(); if(!go) return; _deepLinkDone=true;
+  var map={nippou:"nippou","日報":"nippou",anken:"kanban",kanban:"kanban","案件":"kanban",calendar:"calendar","カレンダー":"calendar",dash:"dash"};
+  var v=map[go]; if(!v) return;
+  var ri=document.querySelector('.rail .ri[data-v="'+v+'"]'); if(ri) ri.click();
+  if(v==="nippou"){ try{ openNippou(); }catch(e){} }
+}
+function afterLoginUi(){ try{ renderDash(); if($("calTarget")){ fillCalTarget(); if(calRoster().indexOf(ME)>=0) $("calTarget").value=ME; renderCalendar(); } applyDeepLink(); }catch(e){} }
 function applyLoginGate(){
   var lv=document.getElementById("loginView");
   if(lv) lv.style.display = ME ? "none" : "flex";
