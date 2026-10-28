@@ -3,11 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>営業管理システム v0.6</title>
+<title>営業管理システム</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js" defer></script>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js" defer></script>
 <style>
 :root{
   --green:#1f6f54; --green-d:#174f3c; --green-l:#e7f3ee;
@@ -292,6 +293,33 @@ select.scell{cursor:pointer}
 .callegend span{display:inline-flex;align-items:center;gap:5px}
 .callegend i{width:12px;height:12px;border-radius:3px;display:inline-block}
 @media(max-width:820px){ .calgrid{gap:3px;padding:8px} .cxl{min-height:46px;padding:4px 5px} .cxl .dn{font-size:10px} .cxl.miss .x,.cxl.ok .cnt,.cxl.tdy .tn{font-size:8px;left:5px;bottom:3px} .cxl .hol{font-size:7px;top:3px;right:4px;max-width:40px} }
+
+/* ===== スマホ：完全レスポンシブ仕上げ ===== */
+@media(max-width:820px){
+  html,body{overflow-x:hidden;max-width:100%}
+  .top{padding:0 12px}
+  .top .crumb{display:none}
+  .top h1{font-size:14px}
+  /* カード内の表は“カードの中だけ”横スクロール（ページ自体は横に動かさない） */
+  .main .card,.main .acard{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  #v-customer table{min-width:540px}
+  .atbl{min-width:480px}
+  /* ツールバー：検索は全幅、セレクト/日付は2列、ボタンは折返し */
+  .vh{gap:8px}
+  .vh .act{width:100%;gap:6px;flex-wrap:wrap}
+  .vh .act .search{width:100%!important;order:-1;margin:0!important}
+  .vh .act select,.vh .act input[type=date]{flex:1 1 44%;min-width:0}
+  .vh .act .btn{flex:0 0 auto}
+  /* 顧客・各一覧カードの余白を詰める */
+  #v-customer .card,#ankList .card{padding:0}
+}
+@media(max-width:480px){
+  .kpis{gap:8px}
+  .kpi{padding:11px 12px}
+  .kpi .v{font-size:19px}
+  .vh h2{font-size:16px}
+  .btn{padding:8px 11px}
+}
 
 </style>
 </head>
