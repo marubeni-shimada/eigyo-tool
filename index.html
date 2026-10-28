@@ -1414,17 +1414,16 @@ function renderAdmin(){
 /* ===== 仮ログイン＋スマホUI制御 ===== */
 function renderLogin(){
   var sel=document.getElementById("loginSel"); if(!sel) return;
-  // ログイン候補＝社員シートが唯一の正。空のときだけ日報の氏名からクリーンに作る。
-  // （案件の担当者名・ブラウザに残った古い名簿は使わない＝会社名などの混入を防ぐ）
+  // ログイン候補＝スプレッドシートの「社員」シートのみ（日報・案件・古いlocalStorageは一切使わない）
   if(typeof DATA!=="undefined" && DATA.members && DATA.members.length){
     MEMBERS = DATA.members.map(function(m){ return {name:String(m["氏名"]||m.name||"").trim(), role:m["役割"]||m.role||"営業", line:m["LINE_ID"]||m.line||"", noti:!!(m["通知を受取"]||m.noti)}; }).filter(function(m){return m.name;});
   } else {
-    var seen={}, list=[];
-    (typeof REP!=="undefined"?REP:[]).forEach(function(r){ var n=String(r.rep||"").trim(); if(n&&!seen[n]){seen[n]=1;list.push({name:n,role:/川井/.test(n)?"部長":"営業",line:"",noti:/川井/.test(n)});} });
-    MEMBERS=list;
+    MEMBERS = [];
   }
   try{saveAdmin();}catch(e){}
-  sel.innerHTML='<option value="">— 選んでください —</option>'+MEMBERS.map(function(m){return '<option'+(m.name===ME?' selected':'')+'>'+aesc(m.name)+'</option>';}).join("");
+  sel.innerHTML = MEMBERS.length
+    ? '<option value="">— 選んでください —</option>'+MEMBERS.map(function(m){return '<option'+(m.name===ME?' selected':'')+'>'+aesc(m.name)+'</option>';}).join("")
+    : '<option value="">（社員シートに社員が未登録です）</option>';
   var go=document.getElementById("loginGo");
   var p=document.querySelector("#loginView p"), hint=document.querySelector("#loginView .hint");
   if(LINE_LINK_MODE){
