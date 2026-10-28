@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>営業管理システム</title>
+<title>営業管理システム v0.6</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
@@ -457,7 +457,7 @@ select.scell{cursor:pointer}
 /* ===== 既存GASバックエンド（Code.gs）に接続。/exec にPOST {fn,args} ===== */
 var GAS_URL = "https://script.google.com/macros/s/AKfycbyw2jiKYjytfEjtWhtTB_PbjT8I8SZ7KrtaJ4XJL4xK4S-eO9EYzthrwltsf6PuUMzxvg/exec";
 /* ===== LINE（下準備）＝LIFF登録後にLIFF IDを入れる。空なら従来の仮ログインのまま ===== */
-var LIFF_ID = "";
+var LIFF_ID = "2009149815-hXigktE9";
 var LINE_USERID = "", LINE_NAME = "", LINE_LINK_MODE = false;
 function gasCall(fn, args){
   return fetch(GAS_URL, {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body:JSON.stringify({fn:fn, args:args||[]})})
