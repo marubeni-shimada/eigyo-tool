@@ -329,6 +329,7 @@ select.scell{cursor:pointer}
     <div class="lg">¥</div>
     <h2>営業管理システム</h2>
     <p>あなたの名前を選んでください</p>
+    <div id="loginLoading" style="display:none;padding:14px 0 6px"><span class="spin"></span><div style="margin-top:10px;color:#6b7280;font-size:13px">LINEでログイン中…</div></div>
     <select id="loginSel"><option value="">— 選んでください —</option></select>
     <input id="loginCode" type="text" inputmode="numeric" autocomplete="off" placeholder="認証コード" style="display:none">
     <button class="go" id="loginGo" disabled>はじめる</button>
@@ -487,7 +488,7 @@ select.scell{cursor:pointer}
 var GAS_URL = "https://script.google.com/macros/s/AKfycbyw2jiKYjytfEjtWhtTB_PbjT8I8SZ7KrtaJ4XJL4xK4S-eO9EYzthrwltsf6PuUMzxvg/exec";
 /* ===== LINE（下準備）＝LIFF登録後にLIFF IDを入れる。空なら従来の仮ログインのまま ===== */
 var LIFF_ID = "2009149815-hXigktE9";
-var LINE_USERID = "", LINE_NAME = "", LINE_LINK_MODE = false;
+var LINE_USERID = "", LINE_NAME = "", LINE_LINK_MODE = false, LIFF_PENDING = false;
 /* 管理者タブを開けるLINE userId（この人だけ管理者メニュー表示・アクセス可）。
    仮ログイン/ローカル(LIFF未設定)では制限しない＝開発用 */
 var ADMIN_LINE_IDS = ["U79713c8a39251a8e78d8d931bb006c17"];
@@ -663,6 +664,7 @@ function afterLoad(connMsg){
       MEMBERS = DATA.members.map(function(m){ return {name:m["氏名"]||m.name||"", role:m["役割"]||m.role||"営業", line:m["LINE_ID"]||m.line||"", noti:!!(m["通知を受取"]||m.noti)}; }).filter(function(m){return m.name;});
       saveAdmin();
     }
+    if(LIFF_ID && !ME){ LIFF_PENDING=true; }
     renderAdmin(); renderMe(); renderLogin(); applyLoginGate(); applyAdminGate();
     if(LIFF_ID){ try{ tryLiffLogin(); }catch(e){} }
   }catch(e){ console.warn("admin init",e); }
@@ -1489,6 +1491,16 @@ function renderLogin(){
     : '<option value="">（社員シートに社員が未登録です）</option>';
   var go=document.getElementById("loginGo");
   var p=document.querySelector("#loginView p"), hint=document.querySelector("#loginView .hint");
+  // 読み込み中（LINE自動ログイン進行中・未紐付け判定前）は、フォームでなくスピナーを出す＝CraftBank風に画面を挟まない
+  var loadingEl=document.getElementById("loginLoading");
+  if(LIFF_ID && LIFF_PENDING && !LINE_LINK_MODE && !ME){
+    if(loadingEl) loadingEl.style.display="block";
+    var ce0=document.getElementById("loginCode"); if(ce0) ce0.style.display="none";
+    [document.getElementById("loginSel"), go, p, hint].forEach(function(el){ if(el) el.style.display="none"; });
+    return;
+  }
+  if(loadingEl) loadingEl.style.display="none";
+  [document.getElementById("loginSel"), go, p, hint].forEach(function(el){ if(el) el.style.display=""; });
   if(LINE_LINK_MODE){
     if(p) p.textContent="LINEと名前を紐付けます（初回のみ）";
     if(hint) hint.innerHTML="LINE表示名：<b>"+aesc(LINE_NAME||"")+"</b><br>あなたの氏名を選ぶと、<b>次回から自動でログイン</b>します。";
@@ -1558,6 +1570,8 @@ function doLogout(){ ME=""; saveAdmin(); applyLoginGate(); renderLogin(); }
    LINEのuserIdを取得→社員シートのLINE_IDで突合して氏名を確定、無ければ表示名。 */
 function tryLiffLogin(){
   if(!LIFF_ID) return;
+  LIFF_PENDING=true;
+  setTimeout(function(){ if(LIFF_PENDING && !ME){ LIFF_PENDING=false; try{renderLogin();}catch(_){} } }, 10000);
   var go=function(){
     try{
       liff.init({liffId:LIFF_ID}).then(function(){
@@ -1566,22 +1580,22 @@ function tryLiffLogin(){
           LINE_USERID=p.userId; LINE_NAME=p.displayName;
           var mem=((typeof DATA!=="undefined"&&DATA.members)||[]).filter(function(m){ return String(m["LINE_ID"]||"")===p.userId; })[0];
           if(mem && String(mem["氏名"]||"").trim()){
-            ME=String(mem["氏名"]).trim(); LINE_LINK_MODE=false;
+            ME=String(mem["氏名"]).trim(); LINE_LINK_MODE=false; LIFF_PENDING=false;
             try{ saveAdmin(); }catch(e){}
             renderMe(); applyLoginGate(); afterLoginUi();
             var cl=$("connLabel"); if(cl) cl.textContent="LINEログイン："+ME;
           } else {
-            LINE_LINK_MODE=true; ME="";
+            LINE_LINK_MODE=true; ME=""; LIFF_PENDING=false;
             renderLogin(); applyLoginGate();
             var cl2=$("connLabel"); if(cl2) cl2.textContent="LINE連携：名前の紐付けが必要";
           }
         });
-      }).catch(function(e){ console.warn("liff init", e); });
+      }).catch(function(e){ console.warn("liff init", e); LIFF_PENDING=false; try{renderLogin();}catch(_){} });
     }catch(e){ console.warn("liff", e); }
   };
   if(typeof liff!=="undefined"){ go(); return; }
   var s=document.createElement("script"); s.src="https://static.line-scdn.net/liff/edge/2/sdk.js";
-  s.onload=go; s.onerror=function(){ console.warn("liff sdk load failed"); }; document.head.appendChild(s);
+  s.onload=go; s.onerror=function(){ console.warn("liff sdk load failed"); LIFF_PENDING=false; try{renderLogin();}catch(_){} }; document.head.appendChild(s);
 }
 // renderMe を拡張（名前・アバター・ログアウト）
 var _origRenderMe = (typeof renderMe==="function") ? renderMe : function(){};
