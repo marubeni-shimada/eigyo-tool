@@ -493,6 +493,8 @@ var LINE_USERID = "", LINE_NAME = "", LINE_LINK_MODE = false, LIFF_PENDING = fal
    仮ログイン/ローカル(LIFF未設定)では制限しない＝開発用 */
 var ADMIN_LINE_IDS = ["U79713c8a39251a8e78d8d931bb006c17"];
 function isAdmin(){ if(!LIFF_ID) return true; return ADMIN_LINE_IDS.indexOf(LINE_USERID)>=0; }
+/* LINE運用時は、ロード直後からログイン画面を出さない（自動ログイン中はアプリを見せ、紐付けが必要な初回だけ後で表示） */
+try{ if(LIFF_ID){ LIFF_PENDING=true; var _lv0=document.getElementById("loginView"); if(_lv0) _lv0.style.display="none"; } }catch(e){}
 function gasCall(fn, args){
   return fetch(GAS_URL, {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body:JSON.stringify({fn:fn, args:args||[]})})
     .then(function(r){return r.json();})
@@ -1565,8 +1567,11 @@ function applyAdminGate(){
   if(!show){ var cur=document.querySelector('.view.on'); if(cur && cur.id==="v-admin"){ var d=document.querySelector('.rail .ri[data-v="dash"]'); if(d) d.click(); } }
 }
 function applyLoginGate(){
-  var lv=document.getElementById("loginView");
-  if(lv) lv.style.display = ME ? "none" : "flex";
+  var lv=document.getElementById("loginView"); if(!lv) return;
+  // LINEで自動ログイン進行中（未紐付け判定前）は、ログイン画面を出さずアプリを見せる。
+  // 名前の紐付けが必要な初回だけログイン画面を出す。
+  var show = !ME && !(LIFF_ID && LIFF_PENDING && !LINE_LINK_MODE);
+  lv.style.display = show ? "flex" : "none";
 }
 function doLogout(){ ME=""; LINE_USERID=""; try{localStorage.removeItem(LS_LINEUID);}catch(e){} saveAdmin(); applyLoginGate(); renderLogin(); }
 /* LIFFログインの骨組み（LIFF_ID未設定なら何もしない＝仮ログインのまま）。
@@ -1574,7 +1579,7 @@ function doLogout(){ ME=""; LINE_USERID=""; try{localStorage.removeItem(LS_LINEU
 function tryLiffLogin(){
   if(!LIFF_ID) return;
   LIFF_PENDING=true;
-  setTimeout(function(){ if(LIFF_PENDING && !ME){ LIFF_PENDING=false; try{renderLogin();}catch(_){} } }, 10000);
+  setTimeout(function(){ if(LIFF_PENDING && !ME){ LIFF_PENDING=false; try{renderLogin();applyLoginGate();}catch(_){} } }, 10000);
   var go=function(){
     try{
       liff.init({liffId:LIFF_ID}).then(function(){
@@ -1593,12 +1598,12 @@ function tryLiffLogin(){
             var cl2=$("connLabel"); if(cl2) cl2.textContent="LINE連携：名前の紐付けが必要";
           }
         });
-      }).catch(function(e){ console.warn("liff init", e); LIFF_PENDING=false; try{renderLogin();}catch(_){} });
+      }).catch(function(e){ console.warn("liff init", e); LIFF_PENDING=false; try{renderLogin();applyLoginGate();}catch(_){} });
     }catch(e){ console.warn("liff", e); }
   };
   if(typeof liff!=="undefined"){ go(); return; }
   var s=document.createElement("script"); s.src="https://static.line-scdn.net/liff/edge/2/sdk.js";
-  s.onload=go; s.onerror=function(){ console.warn("liff sdk load failed"); LIFF_PENDING=false; try{renderLogin();}catch(_){} }; document.head.appendChild(s);
+  s.onload=go; s.onerror=function(){ console.warn("liff sdk load failed"); LIFF_PENDING=false; try{renderLogin();applyLoginGate();}catch(_){} }; document.head.appendChild(s);
 }
 // renderMe を拡張（名前・アバター・ログアウト）
 var _origRenderMe = (typeof renderMe==="function") ? renderMe : function(){};
