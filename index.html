@@ -549,15 +549,14 @@ function toast(msg){var t=$("toast");t.textContent=msg;t.classList.add("on");cle
 /* ===== 起動：GASからデータ取得（失敗時サンプル） ===== */
 function boot(){
   var done=false;
-  // 日報が多く取得に時間がかかっても、必ずスプレッドシートを読む。
-  // タイムアウトでは一旦サンプルを出すが done は立てない→実データが届いたら必ず上書きする。
-  var timer=setTimeout(function(){ if(!done){ useSample("読み込み中…（スプレッドシートを取得しています）"); } }, 20000);
+  // 必ずスプレッドシートを読む。読込が遅くても“サンプルに落とさず待つ”（サンプルはログインを壊すため）。
+  // 失敗(error)したときだけサンプル。長引く時は読み込み中の但し書きだけ出す。
   gasCall("getAllData").then(function(d){
-    done=true; clearTimeout(timer);
+    done=true;
     DATA={customers:(d&&d.customers)||[],members:(d&&d.members)||[],anken:((d&&d.anken)||[]).map(adaptAnken),reports:((d&&d.reports)||[]).map(adaptReport)};
-    // 新GASは空スタートもあり得る＝空でもサンプルに落とさず接続扱い
     USING_SAMPLE=false; afterLoad("クラウド共有に接続");
-  }).catch(function(e){ done=true; clearTimeout(timer); if(!USING_SAMPLE) useSample("GASに接続できませんでした"); });
+  }).catch(function(e){ done=true; useSample("GASに接続できませんでした"); });
+  setTimeout(function(){ if(!done){ var b=document.getElementById("banner"); if(b) b.innerHTML='<div class="note">● 読み込み中…（日報が多いため少し時間がかかります）</div>'; } }, 7000);
 }
 function useSample(why){
   USING_SAMPLE=true;
