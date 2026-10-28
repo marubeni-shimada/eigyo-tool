@@ -167,8 +167,8 @@ tr:hover td{background:#fafbfb}
 .login .lg{width:56px;height:56px;border-radius:16px;background:#16241c;color:#fff;font-size:28px;font-weight:800;display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
 .login h2{font-size:18px;font-weight:800;margin:0 0 4px;color:#16241c}
 .login p{font-size:13px;color:#6b7280;margin:0 0 22px}
-.login select{width:100%;padding:14px 12px;font-size:16px;border:1.5px solid #d6dbe4;border-radius:12px;background:#fff;margin-bottom:14px}
-.login select:focus{outline:none;border-color:#16a06a;box-shadow:0 0 0 3px rgba(22,160,106,.14)}
+.login select,.login input{width:100%;padding:14px 12px;font-size:16px;border:1.5px solid #d6dbe4;border-radius:12px;background:#fff;margin-bottom:14px}
+.login select:focus,.login input:focus{outline:none;border-color:#16a06a;box-shadow:0 0 0 3px rgba(22,160,106,.14)}
 .login .go{width:100%;padding:15px;font-size:16px;font-weight:800;color:#fff;background:#16a06a;border:0;border-radius:12px;cursor:pointer}
 .login .go:hover{background:#138f5e}
 .login .go:disabled{background:#bcd;cursor:default}
@@ -302,6 +302,7 @@ select.scell{cursor:pointer}
     <h2>営業管理システム</h2>
     <p>あなたの名前を選んでください</p>
     <select id="loginSel"><option value="">— 選んでください —</option></select>
+    <input id="loginCode" type="text" inputmode="numeric" autocomplete="off" placeholder="認証コード" style="display:none">
     <button class="go" id="loginGo" disabled>はじめる</button>
     <div class="hint">※ 仮ログインです。あとでLINEログインに置き換わります。<br>名前が無い場合は、管理者ページで社員を追加してください。</div>
   </div>
@@ -516,14 +517,14 @@ function boot(){
   var timer=setTimeout(function(){ if(!done){ done=true; useSample("接続に時間がかかっています"); } }, 8000);
   gasCall("getAllData").then(function(d){
     if(done)return; done=true; clearTimeout(timer);
-    DATA={customers:(d&&d.customers)||[],anken:((d&&d.anken)||[]).map(adaptAnken),reports:((d&&d.reports)||[]).map(adaptReport)};
+    DATA={customers:(d&&d.customers)||[],members:(d&&d.members)||[],anken:((d&&d.anken)||[]).map(adaptAnken),reports:((d&&d.reports)||[]).map(adaptReport)};
     // 新GASは空スタートもあり得る＝空でもサンプルに落とさず接続扱い
     USING_SAMPLE=false; afterLoad("クラウド共有に接続");
   }).catch(function(e){ if(done)return; done=true; clearTimeout(timer); useSample("GASに接続できませんでした"); });
 }
 function useSample(why){
   USING_SAMPLE=true;
-  DATA={customers:SAMPLE.customers.slice(),anken:SAMPLE.anken.slice(),reports:SAMPLE.reports.slice()};
+  DATA={customers:SAMPLE.customers.slice(),members:(function(){var s={},l=[];SAMPLE.reports.concat(SAMPLE.anken).forEach(function(x){var n=String(x.rep||"").trim();if(n&&!s[n]){s[n]=1;l.push({"氏名":n,"役割":/川井/.test(n)?"部長":"営業","LINE_ID":"","通知を受取":""});}});return l;})(),anken:SAMPLE.anken.slice(),reports:SAMPLE.reports.slice()};
   afterLoad("サンプル表示（"+why+"）");
 }
 
@@ -1416,7 +1417,7 @@ function renderLogin(){
   var sel=document.getElementById("loginSel"); if(!sel) return;
   // ログイン候補＝スプレッドシートの「社員」シートのみ（日報・案件・古いlocalStorageは一切使わない）
   if(typeof DATA!=="undefined" && DATA.members && DATA.members.length){
-    MEMBERS = DATA.members.map(function(m){ return {name:String(m["氏名"]||m.name||"").trim(), role:m["役割"]||m.role||"営業", line:m["LINE_ID"]||m.line||"", noti:!!(m["通知を受取"]||m.noti)}; }).filter(function(m){return m.name;});
+    MEMBERS = DATA.members.map(function(m){ return {name:String(m["氏名"]||m.name||"").trim(), role:m["役割"]||m.role||"営業", line:m["LINE_ID"]||m.line||"", noti:!!(m["通知を受取"]||m.noti), needCode:!!m["_needCode"], linked:!!m["_linked"]}; }).filter(function(m){return m.name;});
   } else {
     MEMBERS = [];
   }
@@ -1439,16 +1440,27 @@ function renderLogin(){
     if(hint) hint.innerHTML="※ 仮ログインです。あとでLINEログインに置き換わります。<br>名前が無い場合は、管理者ページで社員を追加してください。";
     go.textContent="はじめる";
   }
-  sel.onchange=function(){ go.disabled=!sel.value; };
-  go.onclick=function(){ if(!sel.value)return; ME=sel.value;
+  function selMember(){ for(var i=0;i<MEMBERS.length;i++){ if(MEMBERS[i].name===sel.value) return MEMBERS[i]; } return null; }
+  var codeEl=document.getElementById("loginCode");
+  if(codeEl) codeEl.style.display="none";
+  sel.onchange=function(){ go.disabled=!sel.value;
+    if(codeEl){ var m=selMember(); var show=(LINE_LINK_MODE && m && m.needCode); codeEl.style.display=show?"block":"none"; if(!show) codeEl.value=""; }
+  };
+  go.onclick=function(){ if(!sel.value)return; var name=sel.value;
     if(LINE_LINK_MODE && LINE_USERID){
-      try{ gasCall("linkLineId",[ME, LINE_USERID]).then(function(){
-        var found=false; DATA.members=DATA.members||[]; DATA.members.forEach(function(m){ if(String(m["氏名"]||"").trim()===ME){ m["LINE_ID"]=LINE_USERID; found=true; } });
-        if(!found) DATA.members.push({"氏名":ME,"役割":"営業","LINE_ID":LINE_USERID,"通知を受取":""});
-      }).catch(function(e){ console.warn("linkLineId",e); }); }catch(e){}
-      LINE_LINK_MODE=false;
+      var code=codeEl?codeEl.value.trim():"";
+      go.disabled=true; var _t=go.textContent; go.textContent="確認中…";
+      gasCall("linkLineId",[name, LINE_USERID, code]).then(function(res){
+        go.disabled=false; go.textContent=_t;
+        if(!res || res.ok===false){ alert((res&&res.error)||"紐付けに失敗しました"); return; }
+        ME=name; DATA.members=DATA.members||[];
+        var f=false; DATA.members.forEach(function(m){ if(String(m["氏名"]||"").trim()===name){ m["LINE_ID"]=LINE_USERID; f=true; } });
+        if(!f) DATA.members.push({"氏名":name,"役割":"営業","LINE_ID":LINE_USERID,"通知を受取":""});
+        LINE_LINK_MODE=false; saveAdmin(); renderMe(); applyLoginGate(); afterLoginUi();
+      }).catch(function(e){ go.disabled=false; go.textContent=_t; alert("エラー："+((e&&e.message)||e)); });
+      return;
     }
-    saveAdmin(); renderMe(); applyLoginGate(); afterLoginUi();
+    ME=name; saveAdmin(); renderMe(); applyLoginGate(); afterLoginUi();
   };
   go.disabled=!sel.value;
 }
