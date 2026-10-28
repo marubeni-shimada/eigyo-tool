@@ -460,6 +460,10 @@ var GAS_URL = "https://script.google.com/macros/s/AKfycbyw2jiKYjytfEjtWhtTB_PbjT
 /* ===== LINE（下準備）＝LIFF登録後にLIFF IDを入れる。空なら従来の仮ログインのまま ===== */
 var LIFF_ID = "2009149815-hXigktE9";
 var LINE_USERID = "", LINE_NAME = "", LINE_LINK_MODE = false;
+/* 管理者タブを開けるLINE userId（この人だけ管理者メニュー表示・アクセス可）。
+   仮ログイン/ローカル(LIFF未設定)では制限しない＝開発用 */
+var ADMIN_LINE_IDS = ["U79713c8a39251a8e78d8d931bb006c17"];
+function isAdmin(){ if(!LIFF_ID) return true; return ADMIN_LINE_IDS.indexOf(LINE_USERID)>=0; }
 function gasCall(fn, args){
   return fetch(GAS_URL, {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body:JSON.stringify({fn:fn, args:args||[]})})
     .then(function(r){return r.json();})
@@ -631,7 +635,7 @@ function afterLoad(connMsg){
       MEMBERS = DATA.members.map(function(m){ return {name:m["氏名"]||m.name||"", role:m["役割"]||m.role||"営業", line:m["LINE_ID"]||m.line||"", noti:!!(m["通知を受取"]||m.noti)}; }).filter(function(m){return m.name;});
       saveAdmin();
     }
-    renderAdmin(); renderMe(); renderLogin(); applyLoginGate();
+    renderAdmin(); renderMe(); renderLogin(); applyLoginGate(); applyAdminGate();
     if(LIFF_ID){ try{ tryLiffLogin(); }catch(e){} }
   }catch(e){ console.warn("admin init",e); }
   $("banner").innerHTML = USING_SAMPLE
@@ -1479,7 +1483,14 @@ function applyDeepLink(){
   var ri=document.querySelector('.rail .ri[data-v="'+v+'"]'); if(ri) ri.click();
   if(v==="nippou"){ try{ openNippou(); }catch(e){} }
 }
-function afterLoginUi(){ try{ renderDash(); if($("calTarget")){ fillCalTarget(); if(calRoster().indexOf(ME)>=0) $("calTarget").value=ME; renderCalendar(); } applyDeepLink(); }catch(e){} }
+function afterLoginUi(){ try{ renderDash(); if($("calTarget")){ fillCalTarget(); if(calRoster().indexOf(ME)>=0) $("calTarget").value=ME; renderCalendar(); } applyAdminGate(); applyDeepLink(); }catch(e){} }
+/* 管理者メニューの出し分け：管理者LINE IDのみ表示。非管理者が管理者画面にいたらダッシュへ戻す */
+function applyAdminGate(){
+  var show=isAdmin();
+  var ra=document.querySelector('.rail .ri[data-v="admin"]'); if(ra) ra.style.display=show?"":"none";
+  var ba=document.querySelector('#btmnav a[data-v="admin"]'); if(ba) ba.style.display=show?"":"none";
+  if(!show){ var cur=document.querySelector('.view.on'); if(cur && cur.id==="v-admin"){ var d=document.querySelector('.rail .ri[data-v="dash"]'); if(d) d.click(); } }
+}
 function applyLoginGate(){
   var lv=document.getElementById("loginView");
   if(lv) lv.style.display = ME ? "none" : "flex";
