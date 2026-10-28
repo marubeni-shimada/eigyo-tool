@@ -549,13 +549,15 @@ function toast(msg){var t=$("toast");t.textContent=msg;t.classList.add("on");cle
 /* ===== 起動：GASからデータ取得（失敗時サンプル） ===== */
 function boot(){
   var done=false;
-  var timer=setTimeout(function(){ if(!done){ done=true; useSample("接続に時間がかかっています"); } }, 8000);
+  // 日報が多く取得に時間がかかっても、必ずスプレッドシートを読む。
+  // タイムアウトでは一旦サンプルを出すが done は立てない→実データが届いたら必ず上書きする。
+  var timer=setTimeout(function(){ if(!done){ useSample("読み込み中…（スプレッドシートを取得しています）"); } }, 20000);
   gasCall("getAllData").then(function(d){
-    if(done)return; done=true; clearTimeout(timer);
+    done=true; clearTimeout(timer);
     DATA={customers:(d&&d.customers)||[],members:(d&&d.members)||[],anken:((d&&d.anken)||[]).map(adaptAnken),reports:((d&&d.reports)||[]).map(adaptReport)};
     // 新GASは空スタートもあり得る＝空でもサンプルに落とさず接続扱い
     USING_SAMPLE=false; afterLoad("クラウド共有に接続");
-  }).catch(function(e){ if(done)return; done=true; clearTimeout(timer); useSample("GASに接続できませんでした"); });
+  }).catch(function(e){ done=true; clearTimeout(timer); if(!USING_SAMPLE) useSample("GASに接続できませんでした"); });
 }
 function useSample(why){
   USING_SAMPLE=true;
@@ -656,7 +658,7 @@ function adaptAnken(a){
 
 function afterLoad(connMsg){
   ANK=DATA.anken.map(function(a,i){a._i=i;return a;});
-  REP=DATA.reports.map(function(r,i){r._i=i;return r;});
+  REP=DATA.reports.map(function(r,i){r._i=i; r._nsite=normSite(r.site); r._ncust=normSite(r.cust); return r;});
   CUST=DATA.customers.slice();
   $("connLabel").textContent=connMsg;
   try{
@@ -700,9 +702,9 @@ function reportsForAnken(a){
   var site=normSite(a.site), client=normSite(a.client);
   if(!site && !client) return [];
   return REP.filter(function(r){
-    var rs=normSite(r.site);
+    var rs=(r._nsite!=null?r._nsite:normSite(r.site));
     if(site && rs && (rs===site || rs.indexOf(site)>=0 || site.indexOf(rs)>=0)) return true;
-    if(!rs && client){ var rc=normSite(r.cust); if(rc && (rc===client || rc.indexOf(client)>=0 || client.indexOf(rc)>=0)) return true; }
+    if(!rs && client){ var rc=(r._ncust!=null?r._ncust:normSite(r.cust)); if(rc && (rc===client || rc.indexOf(client)>=0 || client.indexOf(rc)>=0)) return true; }
     return false;
   }).sort(function(x,y){return String(y.date).localeCompare(String(x.date));});
 }
