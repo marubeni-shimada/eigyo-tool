@@ -271,7 +271,16 @@ tr:hover td{background:#fafbfb}
 .cxl.tdy{background:#fff8e8;border-color:#f0e2bb}
 .cxl.tdy .tn{position:absolute;left:7px;bottom:6px;font-size:9.5px;font-weight:800;color:#7a5b12}
 .cxl.tdy .dn{color:#7a5b12}
-.cxl.fut{opacity:.6}
+.cxl.fut{background:#fbfcfd}
+.cxl.fut .dn{color:#9aa4ae}
+.cxl .ywrap{margin-top:16px;display:flex;flex-direction:column;gap:2px}
+.ypill{font-size:9px;font-weight:700;background:#eef3ff;color:#2563eb;border:1px solid #d6e2fb;border-radius:4px;padding:1px 4px;line-height:1.35;cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:100%}
+.ypill:hover{background:#e0e9fb}
+.upwrap{margin-top:12px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.uphd{font-size:11px;color:var(--sub);font-weight:700;margin-bottom:6px}
+.uprow{padding:7px 2px;border-bottom:1px solid #f1f3f4;cursor:pointer;font-size:12.5px}
+.uprow:last-child{border-bottom:0}.uprow:hover{background:#f7fbf9}
+.uprow b{margin-right:6px}
 .calmatrix{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px}
 table.mtx{border-collapse:separate;border-spacing:3px;font-size:10px}
 table.mtx th{background:none;border:0;color:var(--sub);font-size:10px;font-weight:700;padding:2px;text-align:center;min-width:15px}
@@ -361,8 +370,10 @@ select.scell{cursor:pointer}
       <button class="hamb" id="hamb" aria-label="メニュー"><svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
       <h1 id="topttl">ダッシュボード</h1><span class="crumb" id="topsub">営業全体の状況</span>
       <div class="search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="gsearch" placeholder="案件・顧客・担当を検索"></div>
+      <div class="viewas" id="viewAsWrap" style="display:none;align-items:center;gap:6px;margin-right:10px" title="管理者：他の社員の画面を表示"><span style="font-size:14px">👁</span><select id="viewAsSel" class="btn" style="padding:5px 9px;font-size:12px;max-width:140px" onchange="setViewAs(this.value)"></select></div>
       <div class="usr"><div class="av" id="usrAv">営</div><div class="nm"><span id="usrName">読込中…</span><small id="connLabel">読込中…</small><span class="lo" id="logoutBtn">ログアウト</span></div></div>
     </header>
+    <div id="viewAsBar" style="display:none;background:#fff4d6;border-bottom:1px solid #f0e2bb;color:#7a5b12;font-size:12px;font-weight:600;padding:7px 18px">👁 <b id="viewAsName"></b> さんの画面を表示中（管理者）<span class="lnk" onclick="setViewAs('')" style="margin-left:10px;color:var(--green-d);cursor:pointer;text-decoration:underline">自分に戻る</span></div>
     <main class="main" id="main">
       <div id="banner"></div>
       <!-- ダッシュボード -->
@@ -419,13 +430,14 @@ select.scell{cursor:pointer}
       </section>
       <!-- 日報カレンダー（未提出） -->
       <section class="view" id="v-calendar">
-        <div class="vh"><h2>日報カレンダー</h2><span class="sub">未提出の営業日（月〜金・祝日も出勤）を赤で表示</span>
+        <div class="vh"><h2>カレンダー</h2><span class="sub">未提出の営業日を赤・訪問予定を青で表示（未来日クリックで予定追加）</span>
           <div class="act">
             <select class="btn" id="calTarget" onchange="renderCalendar()"></select>
             <button class="btn" onclick="calShift(-1)" title="前の月">◀</button>
             <span class="btn" id="calTitle" style="min-width:118px;text-align:center;cursor:default"></span>
             <button class="btn" onclick="calShift(1)" title="次の月">▶</button>
             <button class="btn" onclick="calToday()">今月</button>
+            <button class="btn pri" onclick="openYotei(null,'',null)" title="訪問予定を追加">＋訪問予定</button>
           </div>
         </div>
         <div id="calAlert"></div>
@@ -490,6 +502,19 @@ select.scell{cursor:pointer}
     <div class="mh"><h3 id="custTitle">顧客</h3><span class="x" onclick="closeCust()">×</span></div>
     <div class="mb" id="custBody2"></div>
     <div class="mf"><button class="btn" onclick="closeCust()">閉じる</button></div>
+  </div>
+</div>
+<!-- 訪問予定モーダル（カレンダー） -->
+<div class="scrim" id="yoteiScrim">
+  <div class="modal" style="max-width:520px">
+    <div class="mh"><h3 id="yoteiTitle">訪問予定</h3><span class="x" onclick="closeYotei()">×</span></div>
+    <div class="mb">
+      <div class="fld row2"><div class="fld"><label>氏名 *</label><select id="y_rep"></select></div><div class="fld"><label>日付 *</label><input id="y_date" type="date"></div></div>
+      <div class="fld row2"><div class="fld"><label>訪問先</label><input id="y_cust" list="custList" placeholder="顧客名"></div><div class="fld"><label>開始時刻</label><input id="y_start" type="time"></div></div>
+      <div class="fld row2"><div class="fld"><label>現場名</label><input id="y_site" list="ankenSiteList" placeholder="任意"></div><div class="fld"><label>目的</label><input id="y_purpose" placeholder="例：定期訪問"></div></div>
+      <div class="fld"><label>メモ</label><textarea id="y_memo" placeholder="任意"></textarea></div>
+    </div>
+    <div class="mf"><button class="btn" id="yoteiDelBtn" onclick="deleteYoteiUI()" style="margin-right:auto;color:var(--red);border-color:#f3c6bf;display:none">削除</button><button class="btn" onclick="closeYotei()">キャンセル</button><button class="btn pri" onclick="saveYotei()">予定を保存</button></div>
   </div>
 </div>
 <datalist id="custList"></datalist>
@@ -701,6 +726,51 @@ function ensureTokuisaki(cb){
     .catch(function(e){ TOKUI_LOADING=false; console.warn("getTokuisaki",e); if(cb)cb(); });
 }
 
+/* ===== 訪問予定（カレンダー） ===== */
+var YOTEI=[], YOTEI_LOADED=false, YOTEI_LOADING=false, yoteiEditId=null;
+function adaptYotei(o){ o=o||{}; return {id:o["id"]||"", date:normDate(o["日付"]), rep:o["氏名"]||"", cust:o["訪問先"]||"", site:o["現場名"]||"", purpose:o["目的"]||"", start:o["開始時刻"]||"", memo:o["メモ"]||""}; }
+function toYoteiSheet(y){ return {id:y.id||"", "日付":y.date||"", "氏名":y.rep||"", "訪問先":y.cust||"", "現場名":y.site||"", "目的":y.purpose||"", "開始時刻":y.start||"", "メモ":y.memo||""}; }
+function ensureYotei(cb){
+  if(YOTEI_LOADED || YOTEI_LOADING){ if(cb)cb(); return; }
+  if(typeof USING_SAMPLE!=="undefined" && USING_SAMPLE){ YOTEI_LOADED=true; if(cb)cb(); return; }
+  YOTEI_LOADING=true;
+  gasRead("getYotei").then(function(list){ YOTEI=(list||[]).map(adaptYotei); YOTEI_LOADED=true; YOTEI_LOADING=false; if(cb)cb(); })
+    .catch(function(e){ YOTEI_LOADING=false; console.warn("getYotei",e); if(cb)cb(); });
+}
+function yoteiIndex(){ var ix={}; YOTEI.forEach(function(y){ var n=String(y.rep||"").trim(), d=String(y.date||"").slice(0,10); if(!n||!d)return; ((ix[n]=ix[n]||{})[d]=ix[n][d]||[]).push(y); }); return ix; }
+function fillYoteiReps(sel){ var roster=(typeof calRoster==="function"?calRoster():[]); sel.innerHTML=roster.length?roster.map(function(n){return '<option>'+esc(n)+'</option>';}).join(""):'<option>'+esc(ME||"")+'</option>'; }
+function openYotei(id, ds, name){
+  yoteiEditId=id||null;
+  fillYoteiReps($("y_rep"));
+  if(id){ var y=YOTEI.filter(function(x){return String(x.id)===String(id);})[0]||{};
+    $("yoteiTitle").textContent="訪問予定（編集）"; $("y_rep").value=y.rep||ME||""; $("y_date").value=y.date||""; $("y_cust").value=y.cust||""; $("y_start").value=y.start||""; $("y_site").value=y.site||""; $("y_purpose").value=y.purpose||""; $("y_memo").value=y.memo||"";
+    $("yoteiDelBtn").style.display="";
+  } else {
+    $("yoteiTitle").textContent="訪問予定（新規）"; $("y_rep").value=name||ME||""; $("y_date").value=ds||todayStr(); $("y_cust").value=""; $("y_start").value=""; $("y_site").value=""; $("y_purpose").value=""; $("y_memo").value="";
+    $("yoteiDelBtn").style.display="none";
+  }
+  $("yoteiScrim").classList.add("on");
+}
+function closeYotei(){ $("yoteiScrim").classList.remove("on"); }
+function saveYotei(){
+  var rec={id:yoteiEditId||"", rep:$("y_rep").value, date:$("y_date").value, cust:$("y_cust").value.trim(), start:$("y_start").value, site:$("y_site").value.trim(), purpose:$("y_purpose").value.trim(), memo:$("y_memo").value.trim()};
+  if(!rec.rep||!rec.date){ alert("氏名と日付は必須です"); return; }
+  if(typeof USING_SAMPLE!=="undefined" && USING_SAMPLE){ toast("（サンプル表示中：保存されません）"); closeYotei(); return; }
+  var isNew=!yoteiEditId;
+  var p = isNew ? gasCall("addYotei",[toYoteiSheet(rec)]) : gasCall("updateYotei",[toYoteiSheet(rec)]);
+  toast("保存中…");
+  p.then(function(res){ if(isNew){ rec.id=(typeof res==="string"?res:(res&&res.id))||("Y"+Date.now()); YOTEI.push(rec); } else { YOTEI=YOTEI.map(function(x){return String(x.id)===String(rec.id)?rec:x;}); }
+      closeYotei(); renderCalendar(); toast("予定を保存しました"); })
+    .catch(function(e){ toast("保存失敗："+((e&&e.message)||e)); });
+}
+function deleteYoteiUI(){
+  if(!yoteiEditId) return; if(!confirm("この訪問予定を削除しますか？")) return;
+  var id=yoteiEditId;
+  if(typeof USING_SAMPLE!=="undefined" && USING_SAMPLE){ YOTEI=YOTEI.filter(function(x){return String(x.id)!==String(id);}); closeYotei(); renderCalendar(); return; }
+  gasCall("deleteYotei",[id]).then(function(){ YOTEI=YOTEI.filter(function(x){return String(x.id)!==String(id);}); closeYotei(); renderCalendar(); toast("削除しました"); })
+    .catch(function(e){ toast("削除失敗："+((e&&e.message)||e)); });
+}
+
 function adaptReport(o){
   o=o||{};
   return {
@@ -832,7 +902,7 @@ function renderDash(){
 /* ダッシュボードの「日報 未提出」サマリー（自分＋チーム・詳細はカレンダー画面へ） */
 function renderDashUnsub(){
   var host=$("dashUnsub"); if(!host || typeof calIndex!=="function") return;
-  var idx=calIndex(), me=(typeof ME!=="undefined"?ME:""), meLine;
+  var idx=calIndex(), me=(typeof curPerson==="function"?curPerson():ME), meLine;
   if(me){ var md=missedDates(me,idx);
     if(!md.length){ meLine='<span style="color:var(--green-d);font-weight:700">✓ 未提出の日はありません</span>'; }
     else { var show=md.slice(-12), more=md.length-show.length;
@@ -1291,6 +1361,7 @@ function fillCalTarget(){
 function renderCalendar(){
   if(!$("v-calendar")) return;
   if(!calYM) calInit();
+  if(!YOTEI_LOADED && !YOTEI_LOADING){ ensureYotei(function(){ renderCalendar(); }); }
   if(!$("calTarget").options.length) fillCalTarget();
   var idx=calIndex(), roster=calRoster(), target=$("calTarget").value||"__all__";
   $("calTitle").textContent=calYM.y+"年"+(calYM.m+1)+"月";
@@ -1312,10 +1383,11 @@ function renderCalendar(){
   // 凡例
   $("calLegend").innerHTML = (target==="__all__")
     ? '<span><i style="background:#2f9170"></i>提出済</span><span><i style="background:#e4574a"></i>未提出</span><span><i style="background:#e9c558"></i>本日</span><span><i style="background:#eef1f3"></i>未来</span><span>（右端「未」＝当月の未提出 営業日数）</span>'
-    : '<span><i style="background:var(--green-l);border:1px solid #bfe0d2"></i>提出済</span><span><i style="background:#fdecea;border:1px solid #f3c6bf"></i>未提出（営業日）</span><span><i style="background:#fff8e8;border:1px solid #f0e2bb"></i>本日</span><span><i style="background:#f6f7f8;border:1px solid var(--line)"></i>土日（対象外）</span><span style="color:#c02718">赤字＝祝日（出勤・提出対象）</span>';
+    : '<span><i style="background:var(--green-l);border:1px solid #bfe0d2"></i>提出済</span><span><i style="background:#fdecea;border:1px solid #f3c6bf"></i>未提出（営業日）</span><span><i style="background:#fff8e8;border:1px solid #f0e2bb"></i>本日</span><span><i style="background:#eef3ff;border:1px solid #d6e2fb"></i>訪問予定</span><span><i style="background:#f6f7f8;border:1px solid var(--line)"></i>土日（対象外）</span><span style="color:#c02718">赤字＝祝日（出勤・提出対象）</span><span style="color:var(--sub)">未来日クリック＝予定追加／過去日＝日報作成</span>';
 }
 function calPersonHtml(name, idx){
   var y=calYM.y, m=calYM.m, mp=idx[name]||{}, today=dstr(new Date());
+  var yix=(yoteiIndex()[name]||{});
   var startWd=new Date(y,m,1).getDay(), days=new Date(y,m+1,0).getDate(), cells=[];
   for(var i=0;i<startWd;i++) cells.push('<div class="cxl blank"></div>');
   for(var d=1;d<=days;d++){
@@ -1327,10 +1399,19 @@ function calPersonHtml(name, idx){
     else { cls+=" fut"; }
     var dnc="dn"+((wd===0||hol)?" sun":(wd===6?" sat":""));
     var holtag=hol?'<span class="hol" title="'+esc(hol)+'（出勤）">'+esc(hol)+'</span>':"";
-    cells.push('<div class="'+cls+'" style="cursor:pointer" title="クリックでこの日の日報を作成" onclick="openNippouOn(\''+ds+'\')"><span class="'+dnc+'">'+d+'</span>'+holtag+lab+'</div>');
+    // 訪問予定（この日・この人）
+    var yl=yix[ds]||[];
+    var ypills=yl.map(function(yy){ var t=(yy.start?esc(yy.start)+" ":"")+esc(yy.cust||yy.site||yy.purpose||"予定"); return '<span class="ypill" title="予定：クリックで編集" onclick="event.stopPropagation();openYotei(\''+aesc(yy.id)+'\')">'+t+'</span>'; }).join("");
+    // 過去・本日はクリックで日報作成、未来はクリックで訪問予定追加
+    var act = (ds<=today) ? ("openNippouOn('"+ds+"')") : ("openYotei(null,'"+ds+"',"+JSON.stringify(name)+")");
+    var ttl = (ds<=today) ? "クリックでこの日の日報を作成" : "クリックで訪問予定を追加";
+    cells.push('<div class="'+cls+'" style="cursor:pointer" title="'+ttl+'" onclick="'+act+'"><span class="'+dnc+'">'+d+'</span>'+holtag+lab+(ypills?'<div class="ywrap">'+ypills+'</div>':'')+'</div>');
   }
   var head=["日","月","火","水","木","金","土"].map(function(w,i){ var c="cwh"+(i===0?" sun":(i===6?" sat":"")); return '<div class="'+c+'">'+w+'</div>'; }).join("");
-  return '<div class="calgrid">'+head+cells.join("")+'</div>';
+  // 今後の予定（この人・今日以降）
+  var up=YOTEI.filter(function(yy){ return String(yy.rep||"").trim()===name && String(yy.date||"").slice(0,10)>=today; }).sort(function(a,b){return String(a.date).localeCompare(String(b.date));}).slice(0,8);
+  var upHtml=up.length?('<div class="upwrap"><div class="uphd">今後の訪問予定</div>'+up.map(function(yy){return '<div class="uprow" onclick="openYotei(\''+aesc(yy.id)+'\')"><b>'+esc(fmtMD(yy.date))+'</b>'+(yy.start?' <span class="sub">'+esc(yy.start)+'</span>':'')+' '+esc(yy.cust||yy.site||"")+(yy.purpose?'<span class="sub">（'+esc(yy.purpose)+'）</span>':'')+'</div>';}).join("")+'</div>'):'';
+  return '<div class="calgrid">'+head+cells.join("")+'</div>'+upHtml;
 }
 function calMatrixHtml(roster, idx){
   var y=calYM.y, m=calYM.m, days=new Date(y,m+1,0).getDate(), today=dstr(new Date()), biz=[];
@@ -1349,7 +1430,7 @@ function calMatrixHtml(roster, idx){
 }
 
 /* ===== ナビ ===== */
-var TITLE={dash:["ダッシュボード","営業全体の状況"],kanban:["案件管理","ドラッグでフェーズ移動"],nippou:["日報","訪問・現場の記録"],calendar:["日報カレンダー","未提出の営業日を赤で表示"],customer:["顧客・取引先","顧客を起点に一元管理"],estimate:["見積・発注・請求","フェーズ2で搭載"],schedule:["スケジュール","フェーズ2で搭載"],report:["報告書","日報から週報・月報を自動作成"],bi:["レポート・分析","担当者別実績・月次推移・フォロー漏れ"],admin:["管理者","社員・ログイン・通知先の設定"],settings:["設定","ユーザー・権限・LINE連携"]};
+var TITLE={dash:["ダッシュボード","営業全体の状況"],kanban:["案件管理","ドラッグでフェーズ移動"],nippou:["日報","訪問・現場の記録"],calendar:["カレンダー","未提出＝赤／訪問予定＝青"],customer:["顧客・取引先","顧客を起点に一元管理"],estimate:["見積・発注・請求","フェーズ2で搭載"],schedule:["スケジュール","フェーズ2で搭載"],report:["報告書","日報から週報・月報を自動作成"],bi:["レポート・分析","担当者別実績・月次推移・フォロー漏れ"],admin:["管理者","社員・ログイン・通知先の設定"],settings:["設定","ユーザー・権限・LINE連携"]};
 var SOON={
  estimate:{t:"見積・発注・請求",cards:[["見積書作成","テンプレ／過去案件／価格マスタから作成。"],["請求・入金","見積から自動で請求書。入金まで追跡。","↔ 入金消込ツールを統合"],["発注書","協力会社への発注・支払予定。","↔ 支払伝票ツール"]]},
  schedule:{t:"スケジュール・案件割当",cards:[["カレンダー","日・週・月で案件/訪問/工事。"],["案件割当表","担当×時間のガント。","↔ タスク工程ツール"],["日程通知","変更を関係者のLINEへ。","↔ 会議室予約と同じ基盤"]]},
@@ -1680,6 +1761,8 @@ function exportAnken(){
 /* ===== 管理者：社員マスタ／ログイン（仮）／通知先 ===== */
 var LS_MEM="eigyo_members", LS_ME="eigyo_me", LS_NOTI="eigyo_noti", LS_LINEUID="eigyo_lineuid";
 var MEMBERS=[], ME="", NOTI={on:true};
+var VIEW_AS="";  // 管理者が別の社員の画面を見るときにその氏名。空＝自分
+function curPerson(){ return (typeof isAdmin==="function" && isAdmin() && VIEW_AS) ? VIEW_AS : ME; }
 function aesc(x){ return String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 function loadAdmin(){
   try{ MEMBERS=JSON.parse(localStorage.getItem(LS_MEM)||"null")||[]; }catch(e){ MEMBERS=[]; }
@@ -1933,13 +2016,40 @@ function applyDeepLink(){
   var ri=document.querySelector('.rail .ri[data-v="'+v+'"]'); if(ri) ri.click();
   if(v==="nippou"){ try{ openNippou(); }catch(e){} }
 }
-function afterLoginUi(){ try{ applyAdminGate(); }catch(e){} try{ renderDash(); if($("calTarget")){ fillCalTarget(); if(calRoster().indexOf(ME)>=0) $("calTarget").value=ME; renderCalendar(); } if($("nFilterRep")){ $("nFilterRep").value=ME||""; renderNippou(); } try{initReportView();}catch(e){} applyDeepLink(); }catch(e){} }
+function afterLoginUi(){ VIEW_AS=""; try{ applyAdminGate(); }catch(e){} try{ renderDash(); if($("calTarget")){ fillCalTarget(); if(calRoster().indexOf(ME)>=0) $("calTarget").value=ME; renderCalendar(); } if($("nFilterRep")){ $("nFilterRep").value=ME||""; renderNippou(); } try{initReportView();}catch(e){} applyDeepLink(); }catch(e){} }
 /* 管理者メニューの出し分け：管理者LINE IDのみ表示。非管理者が管理者画面にいたらダッシュへ戻す */
 function applyAdminGate(){
   var show=isAdmin();
   var ra=document.querySelector('.rail .ri[data-v="admin"]'); if(ra) ra.style.display=show?"":"none";
   var ba=document.querySelector('#btmnav a[data-v="admin"]'); if(ba) ba.style.display=show?"":"none";
   if(!show){ var cur=document.querySelector('.view.on'); if(cur && cur.id==="v-admin"){ var d=document.querySelector('.rail .ri[data-v="dash"]'); if(d) d.click(); } }
+  // 管理者だけ「他の社員の画面を見る」切替を表示
+  var w=$("viewAsWrap"); if(w){ w.style.display=show?"flex":"none"; if(show) fillViewAs(); else { VIEW_AS=""; } }
+}
+function fillViewAs(){
+  var sel=$("viewAsSel"); if(!sel) return;
+  var roster=(typeof calRoster==="function"?calRoster():[]);
+  // 自分以外も含め全社員を候補に（calRosterは日報必須のみ→ここはMEMBERS全員で）
+  var all=(typeof MEMBERS!=="undefined"?MEMBERS:[]).map(function(m){return String(m.name||"").trim();}).filter(Boolean);
+  if(!all.length) all=roster;
+  sel.innerHTML='<option value="">自分（'+esc(ME||"—")+'）</option>'+all.filter(function(n){return n!==ME;}).map(function(n){return '<option'+(n===VIEW_AS?' selected':'')+'>'+esc(n)+'</option>';}).join("");
+  sel.value=VIEW_AS||"";
+}
+function setViewAs(v){
+  VIEW_AS=v||"";
+  var bar=$("viewAsBar");
+  if(VIEW_AS){ if($("viewAsName")) $("viewAsName").textContent=VIEW_AS; if(bar) bar.style.display="block"; }
+  else { if(bar) bar.style.display="none"; }
+  if($("viewAsSel")) $("viewAsSel").value=VIEW_AS;
+  refreshPersonViews();
+}
+// 「誰の画面か」(自分 or 管理者が選んだ人)に合わせて各ビューの既定を切り替える
+function refreshPersonViews(){
+  var p=curPerson();
+  try{ if($("nFilterRep")){ $("nFilterRep").value=p||""; renderNippou(); } }catch(e){}
+  try{ if($("calTarget")){ fillCalTarget(); var r=(typeof calRoster==="function"?calRoster():[]); $("calTarget").value=(r.indexOf(p)>=0?p:"__all__"); renderCalendar(); } }catch(e){}
+  try{ if($("rpRep")){ var o=[].slice.call($("rpRep").options).map(function(x){return x.value;}); if(o.indexOf(p)>=0) $("rpRep").value=p; renderReport(); } }catch(e){}
+  try{ renderDashUnsub(); }catch(e){}
 }
 function applyLoginGate(){
   // 未ログインの間はログイン画面(スピナー or 名前選択)を必ず被せる＝アプリの初期表示(営業部)を見せない
