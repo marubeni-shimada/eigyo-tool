@@ -412,8 +412,10 @@ select.scell{cursor:pointer}
       </section>
       <!-- 顧客 -->
       <section class="view" id="v-customer">
-        <div class="vh"><h2>顧客・取引先</h2><span class="sub">顧客を起点に案件がつながる</span></div>
-        <div class="card" style="padding:2px"><table><thead><tr><th>顧客名</th><th>部門</th><th>担当</th><th>区分</th><th>売上</th><th>粗利率</th></tr></thead><tbody id="custBody"></tbody></table></div>
+        <div class="vh"><h2>顧客・取引先</h2><span class="sub" id="custSub">案件・日報から自動集計</span>
+          <div class="act"><div class="search" style="width:200px;margin:0"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="cQ" placeholder="顧客・担当・先方で検索" oninput="renderCustomer()"></div></div>
+        </div>
+        <div class="card" style="padding:0;overflow-x:auto"><table style="min-width:760px"><thead><tr><th>顧客名</th><th>自社担当</th><th>先方の担当者</th><th style="text-align:right">案件</th><th style="text-align:right">受注額</th><th style="text-align:right">パイプライン</th><th>最終訪問</th></tr></thead><tbody id="custBody"></tbody></table></div>
       </section>
       <!-- 日報カレンダー（未提出） -->
       <section class="view" id="v-calendar">
@@ -482,6 +484,14 @@ select.scell{cursor:pointer}
     <div class="mf"><button class="btn" id="nippouDelBtn" onclick="deleteNippou()" style="margin-right:auto;color:var(--red);border-color:#f3c6bf;display:none">削除</button><button class="btn" onclick="closeNippou()">キャンセル</button><button class="btn pri" id="nippouSaveBtn" onclick="saveNippou()">日報を保存</button></div>
   </div>
 </div>
+<!-- 顧客モーダル（詳細） -->
+<div class="scrim" id="custScrim">
+  <div class="modal" style="max-width:620px">
+    <div class="mh"><h3 id="custTitle">顧客</h3><span class="x" onclick="closeCust()">×</span></div>
+    <div class="mb" id="custBody2"></div>
+    <div class="mf"><button class="btn" onclick="closeCust()">閉じる</button></div>
+  </div>
+</div>
 <datalist id="custList"></datalist>
 <datalist id="ankenSiteList"></datalist>
 <div class="toast" id="toast"></div>
@@ -536,6 +546,7 @@ var SAMPLE={
 /* ===== 状態 ===== */
 var DATA={customers:[],anken:[],reports:[]};
 var ANK=[], REP=[], CUST=[];
+var TOKUI=[], TOKUI_LOADED=false, TOKUI_LOADING=false;  // 得意先マスタ（弥生）＝顧客タブを開いた時だけ遅延読込
 var USING_SAMPLE=false, editIdx=-1;
 var $=function(id){return document.getElementById(id);};
 function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
@@ -663,6 +674,29 @@ function parseAnkenCSV(text, kind){
     });
   }
   return out;
+}
+/* 得意先CSV（弥生整形後）→ 得意先スキーマ。見出し名でマッピング */
+function parseTokuisakiCSV(text){
+  var rows=csvRows(text); if(rows.length<2) return [];
+  var H=rows[0].map(function(x){return String(x).trim();});
+  var idx={}; H.forEach(function(k,i){ idx[k]=i; });
+  function col(r,name){ return idx[name]!=null ? String(r[idx[name]]||"").trim() : ""; }
+  var out=[];
+  for(var i=1;i<rows.length;i++){ var r=rows[i];
+    var name=col(r,"顧客名")||col(r,"名称")||col(r,"会社名"); if(!name) continue;
+    out.push({ "コード":col(r,"コード"), "顧客名":name, "フリガナ":col(r,"フリガナ"),
+      "自社担当":col(r,"自社担当")||col(r,"担当者")||col(r,"担当"), "担当携帯":col(r,"担当携帯"),
+      "郵便番号":col(r,"郵便番号"), "住所":col(r,"住所"), "TEL":col(r,"TEL")||col(r,"電話"), "取引区分":col(r,"取引区分") });
+  }
+  return out;
+}
+/* 得意先マスタの遅延読込（顧客タブを開いた時だけ） */
+function ensureTokuisaki(cb){
+  if(TOKUI_LOADED || TOKUI_LOADING){ if(cb)cb(); return; }
+  if(typeof USING_SAMPLE!=="undefined" && USING_SAMPLE){ TOKUI_LOADED=true; if(cb)cb(); return; }
+  TOKUI_LOADING=true;
+  gasRead("getTokuisaki").then(function(list){ TOKUI=list||[]; TOKUI_LOADED=true; TOKUI_LOADING=false; if(cb)cb(); })
+    .catch(function(e){ TOKUI_LOADING=false; console.warn("getTokuisaki",e); if(cb)cb(); });
 }
 
 function adaptReport(o){
@@ -897,7 +931,7 @@ function dealCard(a){
     '<div class="nm">'+esc(a.site||"(現場名なし)")+'</div>'+
     '<div class="cl">'+esc(a.client||"")+(a.koushu?'・'+esc(a.koushu):'')+'</div>'+
     ((tags.length||cited)?'<div class="tagw">'+tags.map(function(t){return '<span class="tag '+(/上申/.test(t)?'warn':'')+'">'+esc(t)+'</span>';}).join("")+citeTag+'</div>':'')+
-    '<div class="mt"><span class="amt">'+(nn(a.amount)?yenM(a.amount):'—')+'</span><span style="display:flex;align-items:center;gap:6px">'+(nr?'<span class="tag" title="関連日報 '+nr+'件">📝'+nr+'</span>':'')+'<span class="av" title="'+esc(a.rep||"")+'">'+esc(avatar(a.rep))+'</span></span></div></div>';
+    '<div class="mt"><span class="amt">'+(nn(a.amount)?"¥"+nn(a.amount).toLocaleString():'—')+'</span><span style="display:flex;align-items:center;gap:6px">'+(nr?'<span class="tag" title="関連日報 '+nr+'件">📝'+nr+'</span>':'')+'<span class="av" title="'+esc(a.rep||"")+'">'+esc(avatar(a.rep))+'</span></span></div></div>';
 }
 var dragI=null;
 function bindDnD(){
@@ -1082,11 +1116,77 @@ function deleteNippou(){
   else { after("✓ 日報を削除しました（未保存のため画面のみ）"); }
 }
 
-/* ===== 顧客 ===== */
-function renderCustomer(){
-  var rows=CUST.slice().sort(function(a,b){return nn(b.sales)-nn(a.sales);}).slice(0,200);
-  $("custBody").innerHTML=rows.length?rows.map(function(c){return '<tr><td><b class="lnk">'+esc(c.name)+'</b></td><td>'+esc(c.dept||"")+'</td><td>'+esc(c.rep||"")+'</td><td><span class="pill '+(c.seg==="優良"?"":"g")+'">'+esc(c.seg||"")+'</span></td><td>'+yenS(c.sales)+'円</td><td>'+esc(c.margin)+'%</td></tr>';}).join(""):'<tr><td colspan="6" class="empty">顧客データがありません</td></tr>';
+/* ===== 顧客（案件の発注者＋日報の訪問先から自動集計） ===== */
+function topKey(obj){ var best="",n=-1; for(var k in obj){ if(obj[k]>n){ n=obj[k]; best=k; } } return best; }
+function buildCustomers(){
+  var map={};
+  function get(n){ var k=normSite(n); if(!k) return null; return map[k]||(map[k]={name:String(n).trim(), key:k, reps:{}, aites:{}, ankenN:0, won:0, pipe:0, lost:0, lastVisit:"", visits:0, master:null}); }
+  // 得意先マスタ（弥生）を土台に（読込済みなら）
+  (TOKUI||[]).forEach(function(t){ var n=String(t["顧客名"]||"").trim(); if(!n) return; var c=get(n); if(c && !c.master) c.master=t; });
+  ANK.forEach(function(a){ var c=get(a.client); if(!c) return; c.ankenN++;
+    if(a.rep) c.reps[a.rep]=(c.reps[a.rep]||0)+1;
+    var amt=nn(a.amount);
+    if(/決定|施工|納入|完了/.test(a.status)) c.won+=amt;
+    else if(/営業中|見積提出中|施工予定|納入予定/.test(a.status)) c.pipe+=amt;
+    if(a.status==="失注") c.lost++;
+  });
+  REP.forEach(function(r){ var c=get(r.cust); if(!c) return; c.visits++;
+    if(r.rep) c.reps[r.rep]=(c.reps[r.rep]||0)+1;
+    if(r.aite) c.aites[r.aite]=(c.aites[r.aite]||0)+1;
+    var d=String(r.date||"").slice(0,10); if(d>c.lastVisit) c.lastVisit=d;
+  });
+  return Object.keys(map).map(function(k){ var c=map[k];
+    c.mainRep = (c.master && String(c.master["自社担当"]||"").trim()) || topKey(c.reps);  // 弥生の担当を優先
+    c.contacts=Object.keys(c.aites);
+    c.hasAct = (c.ankenN>0 || c.visits>0);
+    return c;
+  }).sort(function(a,b){ return (b.hasAct?1:0)-(a.hasAct?1:0) || (b.won-a.won) || (b.pipe-a.pipe) || (b.ankenN-a.ankenN) || String(a.name).localeCompare(String(b.name)); });
 }
+var CUSTOMERS=[];
+function renderCustomer(){
+  // 顧客タブを開いたら得意先マスタ（弥生）を遅延読込（初回のみ）
+  if(!TOKUI_LOADED && !TOKUI_LOADING){ ensureTokuisaki(function(){ renderCustomer(); }); }
+  CUSTOMERS=buildCustomers();
+  var q=($("cQ")?$("cQ").value:"").trim();
+  var rows=CUSTOMERS.filter(function(c){ if(!q) return true; var hay=c.name+" "+c.mainRep+" "+c.contacts.join(" ")+" "+((c.master&&(c.master["フリガナ"]+" "+c.master["住所"]+" "+c.master["TEL"]))||""); return hay.indexOf(q)>=0; });
+  if($("custSub")) $("custSub").textContent=(TOKUI_LOADING?"得意先を読み込み中… ":"")+"全"+CUSTOMERS.length+"社"+(TOKUI.length?"（得意先台帳 "+TOKUI.length+"）":"（案件・日報から自動集計）")+(rows.length>300?"・上位300件表示（検索で絞込）":"");
+  $("custBody").innerHTML=rows.length?rows.slice(0,300).map(function(c,i){
+    var contacts=c.contacts.length?(c.contacts.slice(0,2).map(esc).join("・")+(c.contacts.length>2?' 他'+(c.contacts.length-2):'')):'—';
+    return '<tr style="cursor:pointer" onclick="openCust('+CUSTOMERS.indexOf(c)+')"><td><b class="lnk">'+esc(c.name)+'</b></td>'
+      +'<td>'+(c.mainRep?esc(c.mainRep):'—')+'</td>'
+      +'<td>'+contacts+'</td>'
+      +'<td style="text-align:right">'+c.ankenN+'</td>'
+      +'<td style="text-align:right;font-variant-numeric:tabular-nums">'+(c.won?yenS(c.won)+'円':'—')+'</td>'
+      +'<td style="text-align:right;font-variant-numeric:tabular-nums">'+(c.pipe?yenS(c.pipe)+'円':'—')+'</td>'
+      +'<td>'+(c.lastVisit||'—')+'</td></tr>';
+  }).join(""):'<tr><td colspan="7" class="empty">顧客データがありません（案件・日報を取り込むと自動で出ます）</td></tr>';
+}
+function openCust(i){
+  var c=CUSTOMERS[i]; if(!c) return;
+  $("custTitle").textContent=c.name;
+  var k=normSite(c.name);
+  var ans=ANK.filter(function(a){ return normSite(a.client)===k; }).sort(function(a,b){return STATUS.indexOf(a.status)-STATUS.indexOf(b.status);});
+  var reps=REP.filter(function(r){ return normSite(r.cust)===k; }).sort(function(a,b){return String(b.date).localeCompare(String(a.date));});
+  var head='<div class="kpis" style="grid-template-columns:repeat(3,1fr);margin-bottom:12px">'
+    +'<div class="kpi"><div class="l">受注額</div><div class="v" style="font-size:18px">'+yenS(c.won)+'円</div></div>'
+    +'<div class="kpi"><div class="l">パイプライン</div><div class="v" style="font-size:18px">'+yenS(c.pipe)+'円</div></div>'
+    +'<div class="kpi"><div class="l">案件 / 訪問</div><div class="v" style="font-size:18px">'+c.ankenN+' / '+c.visits+'</div></div></div>';
+  var m=c.master;
+  var info='<div class="fld"><label>自社担当</label><div>'+(c.mainRep?esc(c.mainRep):'—')+(m&&m["担当携帯"]?'　<span class="sub">'+esc(m["担当携帯"])+'</span>':'')+(Object.keys(c.reps).length>1?'　<span class="sub">（案件/日報では他 '+(Object.keys(c.reps).length-1)+'名も）</span>':'')+'</div></div>'
+    +'<div class="fld"><label>先方の担当者</label><div>'+(c.contacts.length?c.contacts.map(function(n){return '<span class="pill g">'+esc(n)+'</span>';}).join(" "):'—')+'</div></div>'
+    +(m?('<div class="fld row2"><div class="fld"><label>TEL</label><div>'+(esc(m["TEL"])||'—')+'</div></div><div class="fld"><label>取引区分</label><div>'+(esc(m["取引区分"])||'—')+'</div></div></div>'
+        +'<div class="fld"><label>住所</label><div>'+(m["郵便番号"]?'〒'+esc(m["郵便番号"])+' ':'')+(esc(m["住所"])||'—')+'</div></div>')
+       :'<div class="fld"><div class="sub" style="font-size:11px">※この顧客は得意先台帳（弥生）に未登録です（案件/日報から集計）</div></div>');
+  var ankHtml='<div class="fld"><label>関連案件（'+ans.length+'）</label><div class="lst" style="border:1px solid var(--line);border-radius:8px;padding:2px 10px;max-height:180px;overflow:auto">'
+    +(ans.length?ans.map(function(a){var col=STATUS_COL[a.status]||"#888";return '<div class="li" style="cursor:pointer" data-ank="'+a._i+'"><span class="dot" style="background:'+col+'"></span><div class="g"><b>'+esc(a.site||"")+'</b><small>'+esc(a.status||"")+(nn(a.amount)?'・'+yenS(a.amount)+'円':'')+'</small></div><span class="t">'+esc(a.rep||"")+'</span></div>';}).join(""):'<div class="empty" style="padding:10px 0">案件なし</div>')+'</div></div>';
+  var repHtml='<div class="fld"><label>関連日報（'+reps.length+'）</label><div class="lst" style="border:1px solid var(--line);border-radius:8px;padding:2px 10px;max-height:180px;overflow:auto">'
+    +(reps.length?reps.slice(0,30).map(function(r){return '<div class="li" style="cursor:pointer" data-rep="'+r._i+'"><span class="dot" style="background:'+(nn(r.kettei)>0?"#1f6f54":"#2563eb")+'"></span><div class="g"><b>'+esc(r.date||"")+'　'+esc(r.rep||"")+'</b><small>'+esc(String(r.memo||r.purpose||"").slice(0,40))+'</small></div><span class="t">'+esc(r.aite||"")+'</span></div>';}).join(""):'<div class="empty" style="padding:10px 0">日報なし</div>')+'</div></div>';
+  $("custBody2").innerHTML=head+info+ankHtml+repHtml;
+  $("custBody2").querySelectorAll("[data-ank]").forEach(function(el){ el.onclick=function(){ closeCust(); var ri=document.querySelector('.rail .ri[data-v="kanban"]'); if(ri)ri.click(); openDeal(+el.dataset.ank); }; });
+  $("custBody2").querySelectorAll("[data-rep]").forEach(function(el){ el.onclick=function(){ closeCust(); var ri=document.querySelector('.rail .ri[data-v="nippou"]'); if(ri)ri.click(); openNippou(+el.dataset.rep); }; });
+  $("custScrim").classList.add("on");
+}
+function closeCust(){ $("custScrim").classList.remove("on"); }
 
 /* ===== 日報カレンダー（未提出アラート） ===== */
 var calYM=null;
@@ -1446,6 +1546,13 @@ function renderAdmin(){
       +'<label style="font-size:12.5px"><input type="radio" name="ankcsvmode" value="replace"> 入れ替え</label>'
       +'<button class="btn pri" id="ankCsvGo" disabled>取り込む</button></div>'
       +'<div class="amut" id="ankCsvMsg" style="margin-top:8px"></div></div>'
+      +'<div class="acard"><h3>得意先データの取込（CSV）</h3>'
+      +'<p class="amut">弥生販売の得意先リストを整形したCSV（<code>弥生得意先_整形_…csv</code>）を取り込み、得意先シートに保存します。顧客タブで検索・担当・住所に反映。<b>入れ替え</b>推奨（毎回全件更新）。</p>'
+      +'<div class="arow"><input type="file" id="tkCsvFile" accept=".csv" style="font-size:13px">'
+      +'<label style="font-size:12.5px"><input type="radio" name="tkcsvmode" value="replace" checked> 入れ替え</label>'
+      +'<label style="font-size:12.5px"><input type="radio" name="tkcsvmode" value="add"> 追加</label>'
+      +'<button class="btn pri" id="tkCsvGo" disabled>取り込む</button></div>'
+      +'<div class="amut" id="tkCsvMsg" style="margin-top:8px"></div></div>'
       +'<div class="acard"><h3>LINE連携（下準備）</h3>'
       +'<p class="amut">Messaging APIのトークンを登録し、社員に<b>LINE ID</b>が入ると、<b>日報提出時に「通知を受取」の人へLINEで自動通知</b>されます。手順は <code>pages/手順_LINE連携_2026-10-27.md</code> を参照。</p>'
       +'<div class="arow"><span class="amut" id="lineStat" style="margin:0">連携状態：確認中…</span>'
@@ -1491,6 +1598,25 @@ function renderAdmin(){
         go.disabled=true; msg.textContent="保存中…（"+parsed.length+"件）";
         gasCall("importAnkenCSV",[parsed, mode]).then(function(n){
           msg.textContent="✅ "+n+" 件を保存しました。画面を更新します…";
+          setTimeout(function(){ location.reload(); },1200);
+        }).catch(function(e){ msg.textContent="保存エラー："+e; go.disabled=false; });
+      };
+    })();
+    (function(){
+      var f=$("tkCsvFile"), go=$("tkCsvGo"), msg=$("tkCsvMsg"), parsed=null;
+      if(!f) return;
+      f.onchange=function(){ var file=f.files[0]; if(!file){go.disabled=true;return;}
+        var rd=new FileReader();
+        rd.onload=function(){ try{ parsed=parseTokuisakiCSV(decodeCSVBytes(new Uint8Array(rd.result)));
+          msg.textContent=parsed.length+" 社を読み込みました。「取り込む」で保存します。"; go.disabled=parsed.length===0;
+        }catch(e){ msg.textContent="読み込みエラー："+e; go.disabled=true; } };
+        rd.readAsArrayBuffer(file);
+      };
+      go.onclick=function(){ if(!parsed||!parsed.length) return;
+        var mode=document.querySelector('input[name=tkcsvmode]:checked').value;
+        go.disabled=true; msg.textContent="保存中…（"+parsed.length+"社）しばらくお待ちください";
+        gasCall("importTokuisakiCSV",[parsed, mode]).then(function(n){
+          msg.textContent="✅ "+n+" 社を保存しました。画面を更新します…";
           setTimeout(function(){ location.reload(); },1200);
         }).catch(function(e){ msg.textContent="保存エラー："+e; go.disabled=false; });
       };
