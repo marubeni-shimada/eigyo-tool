@@ -370,10 +370,10 @@ select.scell{cursor:pointer}
       <button class="hamb" id="hamb" aria-label="メニュー"><svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
       <h1 id="topttl">ダッシュボード</h1><span class="crumb" id="topsub">営業全体の状況</span>
       <div class="search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="gsearch" placeholder="案件・顧客・担当を検索"></div>
-      <div class="viewas" id="viewAsWrap" style="display:none;align-items:center;gap:6px;margin-right:10px" title="管理者：他の社員の画面を表示"><span style="font-size:14px">👁</span><select id="viewAsSel" class="btn" style="padding:5px 9px;font-size:12px;max-width:140px" onchange="setViewAs(this.value)"></select></div>
+      <div class="viewas" id="viewAsWrap" style="display:none;align-items:center;gap:6px;margin-right:10px" title="管理者：他の社員の画面を表示"><span style="font-size:14px">👤</span><select id="viewAsSel" class="btn" style="padding:5px 9px;font-size:12px;max-width:140px" onchange="setViewAs(this.value)"></select></div>
       <div class="usr"><div class="av" id="usrAv">営</div><div class="nm"><span id="usrName">読込中…</span><small id="connLabel">読込中…</small><span class="lo" id="logoutBtn">ログアウト</span></div></div>
     </header>
-    <div id="viewAsBar" style="display:none;background:#fff4d6;border-bottom:1px solid #f0e2bb;color:#7a5b12;font-size:12px;font-weight:600;padding:7px 18px">👁 <b id="viewAsName"></b> さんの画面を表示中（管理者）<span class="lnk" onclick="setViewAs('')" style="margin-left:10px;color:var(--green-d);cursor:pointer;text-decoration:underline">自分に戻る</span></div>
+    <div id="viewAsBar" style="display:none;background:#fff4d6;border-bottom:1px solid #f0e2bb;color:#7a5b12;font-size:12px;font-weight:600;padding:7px 18px">👤 <b id="viewAsName"></b> さんの画面を表示中（管理者）<span class="lnk" onclick="setViewAs('')" style="margin-left:10px;color:var(--green-d);cursor:pointer;text-decoration:underline">自分に戻る</span></div>
     <main class="main" id="main">
       <div id="banner"></div>
       <!-- ダッシュボード -->
