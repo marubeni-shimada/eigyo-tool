@@ -1512,7 +1512,15 @@ function renderAdmin(){
     b.onclick=function(){ var i=+b.dataset.mdel; if(!confirm(MEMBERS[i].name+" を削除しますか？")) return; MEMBERS.splice(i,1); saveAdmin(); renderAdmin(); };
   });
   var ad=$("mAdd"); if(ad) ad.onclick=function(){ MEMBERS.push({name:"",role:"営業",line:"",noti:false}); saveAdmin(); renderAdmin(); };
-  var sv=$("mSave"); if(sv) sv.onclick=function(){ MEMBERS=MEMBERS.filter(function(m){return String(m.name||"").trim();}); saveAdmin(); renderAdmin(); var mm=$("mMsg"); if(mm){ mm.textContent="保存しました"; setTimeout(function(){ if($("mMsg"))$("mMsg").textContent=""; },2000);} };
+  var sv=$("mSave"); if(sv) sv.onclick=function(){
+    MEMBERS=MEMBERS.filter(function(m){return String(m.name||"").trim();}); saveAdmin();
+    var mm=$("mMsg"); if(mm) mm.textContent="保存中…";
+    if(typeof USING_SAMPLE!=="undefined" && USING_SAMPLE){ renderAdmin(); if($("mMsg")){$("mMsg").textContent="（サンプル表示中：保存されません）";} return; }
+    // 役割・通知を受取 をスプレッドシートの社員シートへ反映（LINE_ID・認証コードは消さない）
+    var list=MEMBERS.map(function(m){ return {"氏名":m.name, "役割":m.role||"営業", "通知を受取": !!m.noti}; });
+    gasCall("saveMemberFields",[list]).then(function(){ renderAdmin(); if($("mMsg")){ $("mMsg").textContent="保存しました（クラウド）"; setTimeout(function(){ if($("mMsg"))$("mMsg").textContent=""; },2500);} })
+      .catch(function(e){ if($("mMsg")) $("mMsg").textContent="保存エラー："+((e&&e.message)||e); });
+  };
   var no=$("notiOn"); if(no) no.onchange=function(){ NOTI.on=no.checked; saveAdmin(); };
 }
 
