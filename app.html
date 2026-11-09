@@ -301,6 +301,11 @@ table.shtbl th{position:sticky;top:0;z-index:1}
 .scell:focus{outline:none;border-color:var(--green);background:#fff}
 .scell.num{text-align:right;font-variant-numeric:tabular-nums}
 select.scell{cursor:pointer}
+/* 種別セグメント（工事/材料/全体） */
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff}
+.seg .segbtn{border:0;background:#fff;color:var(--sub);font:inherit;font-size:12.5px;font-weight:600;padding:6px 13px;cursor:pointer;border-left:1px solid var(--line);white-space:nowrap}
+.seg .segbtn:first-child{border-left:0}
+.seg .segbtn.on{background:var(--green);color:#fff}
 .callegend{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;font-size:11px;color:var(--sub)}
 .callegend span{display:inline-flex;align-items:center;gap:5px}
 .callegend i{width:12px;height:12px;border-radius:3px;display:inline-block}
@@ -392,7 +397,8 @@ select.scell{cursor:pointer}
           <div class="act">
             <div class="search" style="width:190px;margin:0"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="aQ" placeholder="現場・発注者で検索" oninput="renderAnken()"></div>
             <select class="btn" id="kFilterRep" onchange="renderAnken()"></select>
-            <select class="btn" id="kFilterType" onchange="renderAnken()"><option value="">全種別</option><option>材料</option><option>工事</option></select>
+            <input type="hidden" id="kFilterType" value="">
+            <div class="seg" id="kTypeSeg"><button type="button" class="segbtn" data-t="工事" onclick="setAnkType(this)">工事</button><button type="button" class="segbtn" data-t="材料" onclick="setAnkType(this)">材料</button><button type="button" class="segbtn on" data-t="" onclick="setAnkType(this)">全体</button></div>
             <select class="btn" id="kFilterStatus" onchange="renderAnken()"><option value="">全ステータス</option></select>
             <button class="btn" id="viewToggle" onclick="toggleAnkenView()">表示：カンバン</button>
             <button class="btn" id="sheetToggle" onclick="toggleAnkenSheet()" title="全項目を一覧で表示・直接編集">⊞ 全体シート</button>
@@ -469,7 +475,7 @@ select.scell{cursor:pointer}
     <div class="mb">
       <div class="fld"><label>現場名 *</label><input id="d_site" placeholder="例：大井川マンション 外構改修"></div>
       <div class="fld row2"><div class="fld"><label>発注者</label><input id="d_client" placeholder="例：大野不動産㈱"></div><div class="fld"><label>ステータス</label><select id="d_status"></select></div></div>
-      <div class="fld row2"><div class="fld"><label>種別</label><select id="d_type"><option>材料</option><option>工事</option></select></div><div class="fld"><label>見積金額（円）</label><input id="d_amount" type="number" placeholder="例：4800000"></div></div>
+      <div class="fld row2"><div class="fld"><label>種別</label><select id="d_type"><option>材料</option><option>工事</option></select></div><div class="fld"><label>見積金額（円）</label><input id="d_amount" type="text" inputmode="numeric" class="money" placeholder="例：4,800,000"></div></div>
       <div class="fld" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px"><div class="fld"><label>営業担当者</label><input id="d_rep" placeholder="氏名"></div><div class="fld"><label>工事担当者</label><input id="d_koujiRep" placeholder="氏名"></div><div class="fld"><label>担当役員</label><input id="d_officer" placeholder="氏名"></div></div>
       <div class="fld row2"><div class="fld"><label>受注区分</label><input id="d_kubun" placeholder="例：元請"></div><div class="fld"><label>工種</label><input id="d_koushu" placeholder="例：外構"></div></div>
       <div class="fld row2"><div class="fld"><label>自（着手）</label><input id="d_from" placeholder="例：2026-11-01"></div><div class="fld"><label>至（完了）</label><input id="d_to" placeholder="例：2026-12-20"></div></div>
@@ -490,7 +496,7 @@ select.scell{cursor:pointer}
       <div class="fld"><label>訪問先</label><input id="n_cust" list="custList" placeholder="訪問先（顧客名）"></div>
       <div class="fld row2"><div class="fld"><label>相手（担当者）</label><input id="n_aite" placeholder="任意"></div><div class="fld"><label>現場名</label><input id="n_site" list="ankenSiteList" oninput="onNipSiteInput()" placeholder="任意（案件から選べます）"></div></div>
       <div class="fld row2"><div class="fld"><label>目的</label><input id="n_purpose" placeholder="例：定期訪問"></div><div class="fld"><label>販売内容</label><input id="n_product" placeholder="例：生コン RC-40"></div></div>
-      <div class="fld" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px"><div class="fld"><label>見込売上(円)</label><input id="n_mikomi" type="number"></div><div class="fld"><label>決定売上(円)</label><input id="n_kettei" type="number"></div><div class="fld"><label>粗利額(円)</label><input id="n_arari" type="number"></div></div>
+      <div class="fld" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px"><div class="fld"><label>見込売上(円)</label><input id="n_mikomi" type="text" inputmode="numeric" class="money"></div><div class="fld"><label>決定売上(円)</label><input id="n_kettei" type="text" inputmode="numeric" class="money"></div><div class="fld"><label>粗利額(円)</label><input id="n_arari" type="text" inputmode="numeric" class="money"></div></div>
       <div class="fld"><label>報告事項・所感・次の一手</label><textarea id="n_memo"></textarea></div>
     </div>
     <div class="mf"><button class="btn" id="nippouDelBtn" onclick="deleteNippou()" style="margin-right:auto;color:var(--red);border-color:#f3c6bf;display:none">削除</button><button class="btn" onclick="closeNippou()">キャンセル</button><button class="btn pri" id="nippouSaveBtn" onclick="saveNippou()">日報を保存</button></div>
@@ -575,7 +581,12 @@ var TOKUI=[], TOKUI_LOADED=false, TOKUI_LOADING=false;  // 得意先マスタ（
 var USING_SAMPLE=false, editIdx=-1;
 var $=function(id){return document.getElementById(id);};
 function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
-function nn(x){return Number(x)||0;}
+function nn(x){return Number(String(x==null?0:x).replace(/[,\s]/g,""))||0;}
+/* 金額入力欄：表示はカンマ付き、フォーカス中は数字だけ（編集しやすく）。class="money"を付けた入力に自動適用 */
+function fmtMoney(el){ if(!el)return; var n=nn(el.value); el.value = n ? n.toLocaleString() : ""; }
+function rawMoney(el){ if(!el)return; var n=nn(el.value); el.value = n ? String(n) : ""; }
+document.addEventListener("focusin", function(e){ var t=e.target; if(t&&t.classList&&t.classList.contains("money")) rawMoney(t); });
+document.addEventListener("focusout", function(e){ var t=e.target; if(t&&t.classList&&t.classList.contains("money")) fmtMoney(t); });
 /* 日報必須フラグ：未設定（空欄）は「必須」とみなす（既存の人の挙動を変えない） */
 function parseNeed(v){ if(v==null||v==="") return true; var s=String(v).trim().toLowerCase(); return !(s==="false"||s==="0"||s==="off"||s==="no"||s==="×"||s==="なし"||s==="不要"); }
 /* ローカル日付をYYYY-MM-DDで取得（toISOStringはUTC変換でJST夕方以降に前日へずれるため不使用・正規表現で整形） */
@@ -716,6 +727,52 @@ function parseTokuisakiCSV(text){
       "郵便番号":col(r,"郵便番号"), "住所":col(r,"住所"), "TEL":col(r,"TEL")||col(r,"電話"), "取引区分":col(r,"取引区分") });
   }
   return out;
+}
+/* 担当者セル「氏名　携帯」を 氏名(先頭2語)＋携帯 に分離 */
+function _tantou(raw){
+  raw=String(raw||"").replace(/　/g," ").trim(); if(!raw) return {name:"",mobile:""};
+  var ph=""; var m=raw.match(/0\d{1,4}[-\d]{6,}\d/); if(m) ph=m[0];
+  var np=ph?raw.replace(ph,""):raw;
+  var toks=np.split(/\s+/).filter(function(x){return x && !/^[0-9\-]+$/.test(x);});
+  return {name:toks.slice(0,2).join(" "), mobile:ph};
+}
+/* 弥生の得意先リスト（.xlsx）を直接読み、得意先CSVと同じスキーマで返す（非同期：Promise） */
+function parseTokuisakiXLSX(buf){
+  return new Promise(function(resolve,reject){
+    try{
+      if(typeof ExcelJS==="undefined"){ reject(new Error("Excelライブラリ読込中。少し待って再実行してください")); return; }
+      var wb=new ExcelJS.Workbook();
+      wb.xlsx.load(buf).then(function(){
+        var ws=null;
+        wb.eachSheet(function(s){ if(!ws)ws=s; if(s.name&&/リスト|得意先/.test(s.name))ws=s; });
+        if(!ws){ reject(new Error("シートが見つかりません")); return; }
+        function cv(row,c){ if(!c)return ""; var cell=row.getCell(c); var t=(cell&&cell.text!=null)?cell.text:(cell?cell.value:""); return String(t==null?"":t).replace(/　/g," ").trim(); }
+        var hRow=0, cm={};
+        for(var r=1;r<=12 && !hRow;r++){
+          var row=ws.getRow(r), map={};
+          row.eachCell({includeEmpty:false},function(cell,col){ var v=String((cell.text!=null?cell.text:cell.value)||"").trim(); if(v && map[v]==null){ map[v]=col; } });
+          if(map["コード"]!=null && map["名称"]!=null){ hRow=r; cm=map; }
+        }
+        if(!hRow){ reject(new Error("見出し行（コード/名称）が見つかりません")); return; }
+        var cCode=cm["コード"], cName=cm["名称"], cKana=cm["フリガナ"],
+            cZip=cm["郵便番号"], cAd1=cm["住所１"]||cm["住所1"]||cm["住所"], cAd2=cm["住所２"]||cm["住所2"],
+            cTel=cm["TEL"]||cm["電話"], cKubun=cm["取引区分"],
+            cTan=cm["担当者"]?cm["担当者"]+1:0; /* 「担当者」列=社員コード、氏名＋携帯はその右隣 */
+        var out=[];
+        for(var i=hRow+1;i<=ws.rowCount;i++){
+          var row2=ws.getRow(i);
+          var name=cv(row2,cName); if(!name) continue;
+          if(/^@/.test(cv(row2,cCode))) continue;
+          var t=_tantou(cv(row2,cTan));
+          out.push({ "コード":cv(row2,cCode), "顧客名":name, "フリガナ":cv(row2,cKana),
+            "自社担当":t.name, "担当携帯":t.mobile,
+            "郵便番号":cv(row2,cZip), "住所":cv(row2,cAd1)+cv(row2,cAd2),
+            "TEL":cv(row2,cTel), "取引区分":cv(row2,cKubun) });
+        }
+        resolve(out);
+      }).catch(reject);
+    }catch(e){ reject(e); }
+  });
 }
 /* 得意先マスタの遅延読込（顧客タブを開いた時だけ） */
 function ensureTokuisaki(cb){
@@ -921,6 +978,7 @@ function recentReports(){ var lim=todayStr(new Date(Date.now()-30*864e5)); retur
 /* ===== 案件（カンバン＋一覧・検索/絞り込み） ===== */
 var ankView="kanban", ankTabF="", MYNAME="";
 function ankTab(el){ ankTabF=el.dataset.f||""; document.querySelectorAll("#ankTabs a").forEach(function(a){a.classList.toggle("on",a===el);}); renderAnken(); }
+function setAnkType(el){ var seg=el.parentNode; seg.querySelectorAll(".segbtn").forEach(function(b){b.classList.toggle("on",b===el);}); if($("kFilterType"))$("kFilterType").value=el.dataset.t||""; renderAnken(); }
 function setAnkView(v){ ankView=v;
   $("viewToggle").textContent="表示："+(v==="kanban"?"カンバン":(v==="list"?"一覧":"シート"));
   var st=$("sheetToggle"); if(st) st.classList.toggle("pri", v==="sheet");
@@ -962,7 +1020,7 @@ function renderAnkenSheet(rows){
     var tds=SHEET_COLS.map(function(c){ var k=c[0],t=c[2],v=a[k];
       if(t==="stat"){ var col=STATUS_COL[a.status]||"#888"; return '<td class="shc"><select class="scell" data-i="'+a._i+'" data-k="status" style="color:'+col+';font-weight:700">'+statusOptions(a.status).map(function(s){return '<option'+(s===a.status?' selected':'')+'>'+esc(s)+'</option>';}).join("")+'</select></td>'; }
       if(t==="sel"){ return '<td class="shc"><select class="scell" data-i="'+a._i+'" data-k="'+k+'">'+["材料","工事"].map(function(o){return '<option'+(o===v?' selected':'')+'>'+o+'</option>';}).join("")+'</select></td>'; }
-      if(t==="num"){ return '<td class="shc"><input class="scell num" type="number" data-i="'+a._i+'" data-k="'+k+'" value="'+(nn(v)||"")+'"></td>'; }
+      if(t==="num"){ return '<td class="shc"><input class="scell num money" type="text" inputmode="numeric" data-i="'+a._i+'" data-k="'+k+'" value="'+(nn(v)?nn(v).toLocaleString():"")+'"></td>'; }
       return '<td class="shc"><input class="scell" data-i="'+a._i+'" data-k="'+k+'" value="'+aesc(v||"")+'"></td>';
     }).join("");
     return '<tr>'+tds+'</tr>';
@@ -1029,7 +1087,7 @@ function openDeal(i){
   $("dealDelBtn").style.display=editIdx>=0?"inline-flex":"none";
   fillStatusSelect(a.status);
   $("d_site").value=a.site||""; $("d_client").value=a.client||""; $("d_status").value=a.status||"営業中";
-  $("d_type").value=a.type||"工事"; $("d_amount").value=nn(a.amount)||""; $("d_rep").value=a.rep||"";
+  $("d_type").value=a.type||"工事"; $("d_amount").value=nn(a.amount)?nn(a.amount).toLocaleString():""; $("d_rep").value=a.rep||"";
   $("d_koujiRep").value=a.koujiRep||""; $("d_officer").value=a.officer||""; $("d_kubun").value=a.kubun||""; $("d_koushu").value=a.koushu||"";
   $("d_from").value=a.from||""; $("d_to").value=a.to||""; $("d_gyousha").value=a.gyousha||""; $("d_memo").value=a.memo||"";
   renderDealLinked(editIdx>=0?a:null);
@@ -1134,7 +1192,7 @@ function openNippou(i){
     sel.value = want || (names[0]||"");
   })();
   $("n_cust").value=r.cust||""; $("n_aite").value=r.aite||""; $("n_site").value=r.site||"";
-  $("n_purpose").value=r.purpose||""; $("n_product").value=r.product||""; $("n_mikomi").value=nn(r.mikomi)||""; $("n_kettei").value=nn(r.kettei)||""; $("n_arari").value=nn(r.arari)||""; $("n_memo").value=r.memo||"";
+  $("n_purpose").value=r.purpose||""; $("n_product").value=r.product||""; $("n_mikomi").value=nn(r.mikomi)?nn(r.mikomi).toLocaleString():""; $("n_kettei").value=nn(r.kettei)?nn(r.kettei).toLocaleString():""; $("n_arari").value=nn(r.arari)?nn(r.arari).toLocaleString():""; $("n_memo").value=r.memo||"";
   $("nippouScrim").classList.add("on");
 }
 function closeNippou(){ $("nippouScrim").classList.remove("on"); }
@@ -1835,9 +1893,9 @@ function renderAdmin(){
       +'<label style="font-size:12.5px"><input type="radio" name="ankcsvmode" value="replace"> 入れ替え</label>'
       +'<button class="btn pri" id="ankCsvGo" disabled>取り込む</button></div>'
       +'<div class="amut" id="ankCsvMsg" style="margin-top:8px"></div></div>'
-      +'<div class="acard"><h3>得意先データの取込（CSV）</h3>'
-      +'<p class="amut">弥生販売の得意先リストを整形したCSV（<code>弥生得意先_整形_…csv</code>）を取り込み、得意先シートに保存します。顧客タブで検索・担当・住所に反映。<b>入れ替え</b>推奨（毎回全件更新）。</p>'
-      +'<div class="arow"><input type="file" id="tkCsvFile" accept=".csv" style="font-size:13px">'
+      +'<div class="acard"><h3>得意先データの取込（エクセル / CSV）</h3>'
+      +'<p class="amut">弥生販売の<b>得意先リスト（.xlsx）をそのまま</b>取り込めます（CSVも可）。得意先シートに保存し、顧客タブの検索・担当・住所に反映。<b>入れ替え</b>推奨（毎回全件更新）。</p>'
+      +'<div class="arow"><input type="file" id="tkCsvFile" accept=".csv,.xlsx" style="font-size:13px">'
       +'<label style="font-size:12.5px"><input type="radio" name="tkcsvmode" value="replace" checked> 入れ替え</label>'
       +'<label style="font-size:12.5px"><input type="radio" name="tkcsvmode" value="add"> 追加</label>'
       +'<button class="btn pri" id="tkCsvGo" disabled>取り込む</button></div>'
@@ -1895,10 +1953,20 @@ function renderAdmin(){
       var f=$("tkCsvFile"), go=$("tkCsvGo"), msg=$("tkCsvMsg"), parsed=null;
       if(!f) return;
       f.onchange=function(){ var file=f.files[0]; if(!file){go.disabled=true;return;}
+        var isX=/\.xlsx$/i.test(file.name);
         var rd=new FileReader();
-        rd.onload=function(){ try{ parsed=parseTokuisakiCSV(decodeCSVBytes(new Uint8Array(rd.result)));
-          msg.textContent=parsed.length+" 社を読み込みました。「取り込む」で保存します。"; go.disabled=parsed.length===0;
-        }catch(e){ msg.textContent="読み込みエラー："+e; go.disabled=true; } };
+        rd.onload=function(){
+          if(isX){
+            msg.textContent="エクセルを解析中…（4000社ほどで数秒かかります）"; go.disabled=true;
+            parseTokuisakiXLSX(rd.result).then(function(list){ parsed=list;
+              msg.textContent=parsed.length+" 社を読み込みました。「取り込む」で保存します。"; go.disabled=parsed.length===0;
+            }).catch(function(e){ parsed=null; msg.textContent="読み込みエラー："+((e&&e.message)||e); go.disabled=true; });
+          } else {
+            try{ parsed=parseTokuisakiCSV(decodeCSVBytes(new Uint8Array(rd.result)));
+              msg.textContent=parsed.length+" 社を読み込みました。「取り込む」で保存します。"; go.disabled=parsed.length===0;
+            }catch(e){ msg.textContent="読み込みエラー："+e; go.disabled=true; }
+          }
+        };
         rd.readAsArrayBuffer(file);
       };
       go.onclick=function(){ if(!parsed||!parsed.length) return;
@@ -2016,7 +2084,7 @@ function applyDeepLink(){
   var ri=document.querySelector('.rail .ri[data-v="'+v+'"]'); if(ri) ri.click();
   if(v==="nippou"){ try{ openNippou(); }catch(e){} }
 }
-function afterLoginUi(){ VIEW_AS=""; try{ applyAdminGate(); }catch(e){} try{ renderDash(); if($("calTarget")){ fillCalTarget(); if(calRoster().indexOf(ME)>=0) $("calTarget").value=ME; renderCalendar(); } if($("nFilterRep")){ $("nFilterRep").value=ME||""; renderNippou(); } try{initReportView();}catch(e){} applyDeepLink(); }catch(e){} }
+function afterLoginUi(){ VIEW_AS=""; try{ applyAdminGate(); }catch(e){} try{ renderDash(); if($("calTarget")){ fillCalTarget(); if(calRoster().indexOf(ME)>=0) $("calTarget").value=ME; renderCalendar(); } if($("nFilterRep")){ $("nFilterRep").value=ME||""; renderNippou(); } if($("kFilterRep")){ $("kFilterRep").value=ME||""; renderAnken(); } try{initReportView();}catch(e){} applyDeepLink(); }catch(e){} }
 /* 管理者メニューの出し分け：管理者LINE IDのみ表示。非管理者が管理者画面にいたらダッシュへ戻す */
 function applyAdminGate(){
   var show=isAdmin();
@@ -2047,6 +2115,7 @@ function setViewAs(v){
 function refreshPersonViews(){
   var p=curPerson();
   try{ if($("nFilterRep")){ $("nFilterRep").value=p||""; renderNippou(); } }catch(e){}
+  try{ if($("kFilterRep")){ $("kFilterRep").value=p||""; renderAnken(); } }catch(e){}
   try{ if($("calTarget")){ fillCalTarget(); var r=(typeof calRoster==="function"?calRoster():[]); $("calTarget").value=(r.indexOf(p)>=0?p:"__all__"); renderCalendar(); } }catch(e){}
   try{ if($("rpRep")){ var o=[].slice.call($("rpRep").options).map(function(x){return x.value;}); if(o.indexOf(p)>=0) $("rpRep").value=p; renderReport(); } }catch(e){}
   try{ renderDashUnsub(); }catch(e){}
