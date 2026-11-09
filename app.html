@@ -570,14 +570,22 @@ var LINE_USERID = "", LINE_NAME = "", LINE_LINK_MODE = false, LIFF_PENDING = fal
    仮ログイン/ローカル(LIFF未設定)では制限しない＝開発用 */
 var ADMIN_LINE_IDS = ["U79713c8a39251a8e78d8d931bb006c17"];
 function isAdmin(){ if(!LIFF_ID) return true; return ADMIN_LINE_IDS.indexOf(LINE_USERID)>=0; }
-/* LINE運用時は、ロード直後に「LINEでログイン中…」のスピナーを表示（名前選択は出さない）。
-   自動ログイン完了でログイン画面ごと消える／紐付けが必要な初回だけ名前選択を出す。 */
-try{ if(LIFF_ID){ LIFF_PENDING=true;
-  var _ll=document.getElementById("loginLoading"); if(_ll) _ll.style.display="block";
-  ["loginSel","loginGo","loginCode"].forEach(function(id){ var e=document.getElementById(id); if(e) e.style.display="none"; });
-  var _p=document.querySelector("#loginView p"); if(_p) _p.style.display="none";
-  var _h=document.querySelector("#loginView .hint"); if(_h) _h.style.display="none";
-} }catch(e){}
+/* ===== ログイン永続化：Cookieにも保存（localStorageが消えても残る＝スマホのLINEブラウザ対策） ===== */
+function setCk(n,v,days){ try{ var d=new Date(); d.setTime(d.getTime()+((days||365)*864e5)); document.cookie=n+"="+encodeURIComponent(v||"")+";expires="+d.toUTCString()+";path=/;SameSite=Lax"; }catch(e){} }
+function getCk(n){ try{ var m=document.cookie.match("(?:^|; )"+String(n).replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"=([^;]*)"); return m?decodeURIComponent(m[1]):""; }catch(e){ return ""; } }
+function delCk(n){ try{ document.cookie=n+"=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;SameSite=Lax"; }catch(e){} }
+/* ロード直後：記憶済みなら「LINEでログイン中…」を出さず“読み込み中”だけ出してそのままアプリへ（CraftBank方式）。初回（未記憶）のみLINE認証。 */
+try{
+  var _cm=getCk("eigyo_me"); if(!_cm){ try{ _cm=localStorage.getItem("eigyo_me")||""; }catch(e){} }
+  if(LIFF_ID || _cm){
+    if(LIFF_ID && !_cm){ LIFF_PENDING=true; }           // 初回（未記憶）のみLINEログイン
+    var _ll=document.getElementById("loginLoading");
+    if(_ll){ var _lt=_ll.querySelector("div"); if(_lt) _lt.textContent=_cm?"読み込み中…":"LINEでログイン中…"; _ll.style.display="block"; }
+    ["loginSel","loginGo","loginCode"].forEach(function(id){ var e=document.getElementById(id); if(e) e.style.display="none"; });
+    var _p=document.querySelector("#loginView p"); if(_p) _p.style.display="none";
+    var _h=document.querySelector("#loginView .hint"); if(_h) _h.style.display="none";
+  }
+}catch(e){}
 function gasCall(fn, args){
   return fetch(GAS_URL, {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body:JSON.stringify({fn:fn, args:args||[]})})
     .then(function(r){return r.json();})
@@ -2020,11 +2028,13 @@ function aesc(x){ return String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g
 function loadAdmin(){
   try{ MEMBERS=JSON.parse(localStorage.getItem(LS_MEM)||"null")||[]; }catch(e){ MEMBERS=[]; }
   try{ ME=localStorage.getItem(LS_ME)||""; }catch(e){ ME=""; }
+  if(!ME){ ME=getCk("eigyo_me")||""; }                 // localStorageが消えててもCookieから復元
   try{ LINE_USERID=localStorage.getItem(LS_LINEUID)||LINE_USERID||""; }catch(e){}
+  if(!LINE_USERID){ LINE_USERID=getCk("eigyo_uid")||LINE_USERID||""; }
   try{ NOTI=JSON.parse(localStorage.getItem(LS_NOTI)||"null")||{on:true}; }catch(e){ NOTI={on:true}; }
   if(!MEMBERS.length){ MEMBERS=seedMembers(); saveAdmin(); }
 }
-function saveAdmin(){ try{ localStorage.setItem(LS_MEM,JSON.stringify(MEMBERS)); localStorage.setItem(LS_ME,ME||""); localStorage.setItem(LS_LINEUID,LINE_USERID||""); localStorage.setItem(LS_NOTI,JSON.stringify(NOTI)); }catch(e){} }
+function saveAdmin(){ try{ localStorage.setItem(LS_MEM,JSON.stringify(MEMBERS)); localStorage.setItem(LS_LINEUID,LINE_USERID||""); localStorage.setItem(LS_NOTI,JSON.stringify(NOTI)); if(ME){ localStorage.setItem(LS_ME,ME); } }catch(e){} try{ if(ME){ setCk("eigyo_me",ME,365); } if(LINE_USERID){ setCk("eigyo_uid",LINE_USERID,365); } }catch(e){} }  // MEは「入っている時だけ」保存＝renderLogin等がME空で呼んでも記憶を消さない
 function seedMembers(){
   // 社員の取得元＝日報(REP=氏名)＋案件(営業担当者)の実在する名前を集約。新スキーマは正しく氏名が入る
   var seen={}, out=[];
@@ -2320,7 +2330,7 @@ function applyLoginGate(){
   // 未ログインの間はログイン画面(スピナー or 名前選択)を必ず被せる＝アプリの初期表示(営業部)を見せない
   var lv=document.getElementById("loginView"); if(lv) lv.style.display = ME ? "none" : "flex";
 }
-function doLogout(){ ME=""; LINE_USERID=""; try{localStorage.removeItem(LS_LINEUID);}catch(e){} saveAdmin(); applyLoginGate(); renderLogin(); }
+function doLogout(){ ME=""; LINE_USERID=""; try{localStorage.removeItem(LS_LINEUID); localStorage.removeItem(LS_ME);}catch(e){} try{ delCk("eigyo_me"); delCk("eigyo_uid"); }catch(e){} saveAdmin(); applyLoginGate(); renderLogin(); }
 /* LIFFログインの骨組み（LIFF_ID未設定なら何もしない＝仮ログインのまま）。
    LINEのuserIdを取得→社員シートのLINE_IDで突合して氏名を確定、無ければ表示名。 */
 function tryLiffLogin(){
