@@ -977,7 +977,8 @@ function recentReports(){ var lim=todayStr(new Date(Date.now()-30*864e5)); retur
 
 /* ===== 案件（カンバン＋一覧・検索/絞り込み） ===== */
 var ankView="kanban", ankTabF="", MYNAME="";
-function ankTab(el){ ankTabF=el.dataset.f||""; document.querySelectorAll("#ankTabs a").forEach(function(a){a.classList.toggle("on",a===el);}); renderAnken(); }
+function ankTabSet(f){ ankTabF=f||""; document.querySelectorAll("#ankTabs a").forEach(function(a){a.classList.toggle("on",(a.dataset.f||"")===ankTabF);}); }
+function ankTab(el){ ankTabSet(el.dataset.f||""); renderAnken(); }
 function setAnkType(el){ var seg=el.parentNode; seg.querySelectorAll(".segbtn").forEach(function(b){b.classList.toggle("on",b===el);}); if($("kFilterType"))$("kFilterType").value=el.dataset.t||""; renderAnken(); }
 function setAnkView(v){ ankView=v;
   $("viewToggle").textContent="表示："+(v==="kanban"?"カンバン":(v==="list"?"一覧":"シート"));
@@ -993,7 +994,7 @@ function ankenRows(){
     if(fr&&a.rep!==fr)return false; if(ft&&a.type!==ft)return false; if(fs&&a.status!==fs)return false;
     if(ankTabF==="open"&&!/営業中|見積提出中|決定|施工予定|施工中|納入中/.test(a.status))return false;
     if(ankTabF==="lost"&&a.status!=="失注")return false;
-    if(ankTabF==="mine"&&MYNAME&&a.rep!==MYNAME)return false;
+    if(ankTabF==="mine"){ var _me=(typeof curPerson==="function"?curPerson():ME); if(_me&&a.rep!==_me)return false; }
     if(q){ var hay=(String(a.site||"")+String(a.client||"")+String(a.rep||"")+String(a.koushu||"")); if(hay.indexOf(q)<0)return false; }
     return true;
   });
@@ -2084,7 +2085,7 @@ function applyDeepLink(){
   var ri=document.querySelector('.rail .ri[data-v="'+v+'"]'); if(ri) ri.click();
   if(v==="nippou"){ try{ openNippou(); }catch(e){} }
 }
-function afterLoginUi(){ VIEW_AS=""; try{ applyAdminGate(); }catch(e){} try{ renderDash(); if($("calTarget")){ fillCalTarget(); if(calRoster().indexOf(ME)>=0) $("calTarget").value=ME; renderCalendar(); } if($("nFilterRep")){ $("nFilterRep").value=ME||""; renderNippou(); } if($("kFilterRep")){ $("kFilterRep").value=ME||""; renderAnken(); } try{initReportView();}catch(e){} applyDeepLink(); }catch(e){} }
+function afterLoginUi(){ VIEW_AS=""; try{ applyAdminGate(); }catch(e){} try{ renderDash(); if($("calTarget")){ fillCalTarget(); if(calRoster().indexOf(ME)>=0) $("calTarget").value=ME; renderCalendar(); } if($("nFilterRep")){ $("nFilterRep").value=ME||""; renderNippou(); } if($("kFilterRep")) $("kFilterRep").value=""; try{ ankTabSet("mine"); }catch(e){} renderAnken(); try{initReportView();}catch(e){} applyDeepLink(); }catch(e){} }
 /* 管理者メニューの出し分け：管理者LINE IDのみ表示。非管理者が管理者画面にいたらダッシュへ戻す */
 function applyAdminGate(){
   var show=isAdmin();
@@ -2115,7 +2116,7 @@ function setViewAs(v){
 function refreshPersonViews(){
   var p=curPerson();
   try{ if($("nFilterRep")){ $("nFilterRep").value=p||""; renderNippou(); } }catch(e){}
-  try{ if($("kFilterRep")){ $("kFilterRep").value=p||""; renderAnken(); } }catch(e){}
+  try{ if($("kFilterRep")) $("kFilterRep").value=""; ankTabSet("mine"); renderAnken(); }catch(e){}
   try{ if($("calTarget")){ fillCalTarget(); var r=(typeof calRoster==="function"?calRoster():[]); $("calTarget").value=(r.indexOf(p)>=0?p:"__all__"); renderCalendar(); } }catch(e){}
   try{ if($("rpRep")){ var o=[].slice.call($("rpRep").options).map(function(x){return x.value;}); if(o.indexOf(p)>=0) $("rpRep").value=p; renderReport(); } }catch(e){}
   try{ renderDashUnsub(); }catch(e){}
