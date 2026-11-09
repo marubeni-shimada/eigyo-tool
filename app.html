@@ -455,7 +455,7 @@ select.scell{cursor:pointer}
             <button class="btn pri" onclick="openNippou()"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>日報を書く</button>
           </div>
         </div>
-        <div class="vh" style="margin-top:-6px"><span class="sub">期間</span><input class="btn" type="date" id="nFrom" onchange="renderNippou()" style="padding:5px 9px"><span class="sub">〜</span><input class="btn" type="date" id="nTo" onchange="renderNippou()" style="padding:5px 9px">
+        <div class="vh" style="margin-top:-6px"><span class="sub">期間</span><input class="btn" type="date" id="nFrom" onchange="onNipFrom()" style="padding:5px 9px"><span class="sub">〜</span><input class="btn" type="date" id="nTo" onchange="renderNippou()" style="padding:5px 9px">
           <div class="act"><span class="sub">🖨 営業日報：</span><select class="btn" id="pdRep"><option value="">氏名</option></select><select class="btn" id="pdDate"><option value="">日付</option></select><button class="btn" onclick="printDay()" title="上の日付の1日分">1日分</button><span class="sub" style="margin-left:4px">週:</span><input type="date" class="btn" id="pwDate" style="padding:5px 9px" title="この日を含む週（月〜金）を印刷"><button class="btn" onclick="printWeek()" title="選んだ週（月〜金）を1日様式で5枚続けて印刷">週間(月〜金)</button></div>
         </div>
         <div class="np" id="nippou"></div>
@@ -620,6 +620,29 @@ var DATA={customers:[],anken:[],reports:[]};
 var ANK=[], REP=[], CUST=[];
 var TOKUI=[], TOKUI_LOADED=false, TOKUI_LOADING=false;  // 得意先マスタ（弥生）＝顧客タブを開いた時だけ遅延読込
 var USING_SAMPLE=false, editIdx=-1;
+var _ankenLoaded=false, _reportsLoaded=false;  // 3分割読込の完了フラグ（未完了は「読み込み中」表示にして0件に見せない）
+/* ===== 日報の遅延読込：778件を毎回取らず、直近だけ＋必要な時にその期間だけ取りに行く ===== */
+var _repFrom=null;             // [_repFrom..今日] は読込済み（この範囲は全部ある、という不変条件）
+var LS_CACHE="eigyo_cache_v1"; // 前回データをブラウザ記憶→開いた瞬間に表示（裏で最新に更新）
+function ymdMinusDays(n){ var d=new Date(); d.setDate(d.getDate()-n); return todayStr(d); }
+function dayBefore(ymd){ var d=new Date(ymd+"T00:00:00"); if(isNaN(d.getTime()))return ymd; d.setDate(d.getDate()-1); return todayStr(d); }
+function rebuildREP(){ REP=(DATA.reports||[]).map(function(r,i){ r._i=i; r._nsite=normSite(r.site); r._ncust=normSite(r.cust); return r; }); }
+function cacheSave(){ try{ localStorage.setItem(LS_CACHE, JSON.stringify({t:Date.now(), repFrom:_repFrom, reports:DATA.reports, anken:DATA.anken, customers:DATA.customers, members:DATA.members})); }catch(e){} }
+function cacheLoad(){ try{ var c=JSON.parse(localStorage.getItem(LS_CACHE)||"null"); if(c && c.reports){ DATA.reports=c.reports||[]; DATA.anken=c.anken||[]; DATA.customers=c.customers||[]; if(c.members&&c.members.length) DATA.members=c.members; _repFrom=c.repFrom||null; _reportsLoaded=true; _ankenLoaded=true; return true; } }catch(e){} return false; }
+function _appendReports(raw){ var have={}; (DATA.reports||[]).forEach(function(r){ if(r._id) have[String(r._id)]=1; }); raw.map(adaptReport).forEach(function(r){ if(!r._id || !have[String(r._id)]){ DATA.reports.push(r); if(r._id)have[String(r._id)]=1; } }); rebuildREP(); }
+/* fromYmd まで日報を遡って確保してから cb。既にあれば即cb。旧GAS(range未搭載)は全件で代替 */
+function ensureReportsFrom(fromYmd, cb){
+  fromYmd=normDate(fromYmd)||ymdMinusDays(120);
+  if(USING_SAMPLE || (_repFrom && fromYmd>=_repFrom)){ cb&&cb(); return; }
+  var to=_repFrom?dayBefore(_repFrom):todayStr();
+  gasCall("getReportsRange",[fromYmd,to]).then(function(rs){
+    if(Array.isArray(rs)){ _appendReports(rs); _repFrom=fromYmd; cacheSave(); }
+    cb&&cb();
+  }).catch(function(){
+    gasCall("getReports").then(function(rs){ if(Array.isArray(rs)){ DATA.reports=rs.map(adaptReport); rebuildREP(); _repFrom="0000-01-01"; cacheSave(); } cb&&cb(); }).catch(function(){ cb&&cb(); });
+  });
+}
+function _calMonthStart(){ if(typeof calYM==="undefined"||!calYM) return ymdMinusDays(40); return calYM.y+"-"+("0"+(calYM.m+1)).slice(-2)+"-01"; }
 var $=function(id){return document.getElementById(id);};
 function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
 function nn(x){return Number(String(x==null?0:x).replace(/[,\s]/g,""))||0;}
@@ -655,6 +678,7 @@ function gasRead(fn, tries){
   });
 }
 function boot(){
+  if(cacheLoad()){ try{ afterLoad("キャッシュ表示・最新に更新中…"); }catch(e){} }  // 前回分を即表示→裏で最新に更新
   var membersOK=false, coreOK=false;
   // ① 社員だけ先に軽く取得→ログインを速く・確実に
   gasRead("getMembers").then(function(ms){
@@ -668,22 +692,25 @@ function boot(){
     if(!membersOK && c && c.members){ DATA.members=c.members; }
     DATA.anken=((c&&c.anken)||[]).map(adaptAnken);
     DATA.customers=(c&&c.customers)||[];
-    USING_SAMPLE=false; afterLoad("クラウド共有に接続");
+    _ankenLoaded=true; USING_SAMPLE=false; afterLoad("クラウド共有に接続");
   }).catch(function(e){ console.warn("getCore", e);
     if(!membersOK){ useSample("GASに接続できませんでした"); }
     else { DATA.anken=DATA.anken||[]; afterLoad("接続（案件の取得に失敗・再読み込み）"); }
   });
   // ③ 日報（重い）→ 後から取得して反映（失敗しても案件は表示済み）
-  gasRead("getReports").then(function(rs){
-    DATA.reports=((rs)||[]).map(adaptReport);
-    if(!USING_SAMPLE){ try{ afterLoad("クラウド共有に接続"); }catch(e){} }
-  }).catch(function(e){ console.warn("getReports", e);
-    try{ var b=document.getElementById("banner"); if(b && !USING_SAMPLE) b.innerHTML='<div class="note warn">● 日報の取得に失敗しました（案件は表示中）。再読み込みで取得します。</div>'; }catch(_){}
-  });
+  // ③ 日報：まず直近120日だけ軽く（古い分は分析/カレンダー/印刷など必要時にその期間だけ取得）
+  (function(){ var _bf=ymdMinusDays(120);
+    gasCall("getReportsRange",[_bf, todayStr()]).then(function(rs){
+      if(Array.isArray(rs)){ DATA.reports=rs.map(adaptReport); _reportsLoaded=true; _repFrom=_bf; cacheSave(); }
+      if(!USING_SAMPLE){ try{ afterLoad("クラウド共有に接続"); }catch(e){} }
+    }).catch(function(e){ console.warn("getReportsRange", e);
+      gasRead("getReports").then(function(rs){ if(Array.isArray(rs)){ DATA.reports=rs.map(adaptReport); _reportsLoaded=true; _repFrom="0000-01-01"; cacheSave(); } if(!USING_SAMPLE){ try{ afterLoad("クラウド共有に接続"); }catch(e){} } }).catch(function(){ try{ var b=document.getElementById("banner"); if(b && !USING_SAMPLE) b.innerHTML='<div class="note warn">● 日報の取得に失敗しました（案件は表示中）。再読み込みで取得します。</div>'; }catch(_){} });
+    });
+  })();
   setTimeout(function(){ try{ var b=document.getElementById("banner"); if(b && !USING_SAMPLE && !coreOK) b.innerHTML='<div class="note">● 読み込み中…</div>'; }catch(e){} }, 7000);
 }
 function useSample(why){
-  USING_SAMPLE=true;
+  USING_SAMPLE=true; _ankenLoaded=true; _reportsLoaded=true;
   DATA={customers:SAMPLE.customers.slice(),members:(function(){var s={},l=[];SAMPLE.reports.concat(SAMPLE.anken).forEach(function(x){var n=String(x.rep||"").trim();if(n&&!s[n]){s[n]=1;l.push({"氏名":n,"役割":/川井/.test(n)?"部長":"営業","LINE_ID":"","通知を受取":""});}});return l;})(),anken:SAMPLE.anken.slice(),reports:SAMPLE.reports.slice()};
   afterLoad("サンプル表示（"+why+"）");
 }
@@ -982,7 +1009,8 @@ function renderDash(){
   var pipe=open.reduce(function(s,a){return s+nn(a.amount);},0);
   var lost=ANK.filter(function(a){return a.status==="失注";}).length;
   var rate=ANK.length?Math.round(lost/ANK.length*100):0;
-  $("dashSub").textContent=(USING_SAMPLE?"サンプル":"実データ")+" / 案件"+ANK.length+"件・日報"+REP.length+"件";
+  var _ac=(USING_SAMPLE||_ankenLoaded)?(ANK.length+"件"):"読み込み中…", _rc=(USING_SAMPLE||_reportsLoaded)?(REP.length+"件"):"読み込み中…";
+  $("dashSub").textContent=(USING_SAMPLE?"サンプル":"実データ")+" / 案件"+_ac+"・日報"+_rc;
   $("kpis").innerHTML=
     '<div class="kpi"><div class="l">受注〜進行中の金額</div><div class="v">'+yenS(won)+'円</div><div class="d up">決定以降 '+ANK.filter(function(a){return /決定|施工|納入|完了/.test(a.status);}).length+'件</div></div>'+
     '<div class="kpi"><div class="l">パイプライン金額</div><div class="v">'+yenS(pipe)+'円</div><div class="d">進行中 '+open.length+'案件</div></div>'+
@@ -994,7 +1022,7 @@ function renderDash(){
   $("plMm").textContent="全"+ANK.length+"案件";
   $("plBox").innerHTML=cols.map(function(s){return '<div class="row"><span style="color:'+STATUS_COL[s]+';font-weight:700">●</span><span>'+s+'</span><div class="bar"><i style="width:'+Math.round((sum[s]||0)/max*100)+'%;background:'+STATUS_COL[s]+'"></i></div><span class="amt">'+yenS(sum[s]||0)+'</span></div>';}).join("");
   var feed=REP.slice().sort(function(a,b){return String(b.date).localeCompare(String(a.date));}).slice(0,6);
-  $("feedBox").innerHTML=feed.length?feed.map(function(r){var line=(r.kettei>0?"受注 "+yenS(r.kettei)+"円：":"")+(r.cust||r.site||"")+"／"+String(r.memo||"").slice(0,40);return '<div class="li"><span class="dot" style="background:'+(r.kettei>0?"#1f6f54":"#2563eb")+'"></span><div class="g"><b>'+esc(line)+'</b><small>'+esc(r.rep||"")+'</small></div><span class="t">'+esc(r.date||"")+'</span></div>';}).join(""):'<div class="empty">日報がまだありません</div>';
+  $("feedBox").innerHTML=feed.length?feed.map(function(r){var line=(r.kettei>0?"受注 "+yenS(r.kettei)+"円：":"")+(r.cust||r.site||"")+"／"+String(r.memo||"").slice(0,40);return '<div class="li"><span class="dot" style="background:'+(r.kettei>0?"#1f6f54":"#2563eb")+'"></span><div class="g"><b>'+esc(line)+'</b><small>'+esc(r.rep||"")+'</small></div><span class="t">'+esc(r.date||"")+'</span></div>';}).join(""):'<div class="empty">'+((USING_SAMPLE||_reportsLoaded)?"日報がまだありません":"日報を読み込み中…")+'</div>';
   renderDashUnsub();
 }
 /* ダッシュボードの「日報 未提出」サマリー（自分＋チーム・詳細はカレンダー画面へ） */
@@ -1269,8 +1297,8 @@ function saveNippou(){
     purpose:$("n_purpose").value.trim(),product:$("n_product").value.trim(),mikomi:nn($("n_mikomi").value),
     kettei:nn($("n_kettei").value),arari:nn($("n_arari").value),memo:memo};
   if(nipEdit>=0){ var r=REP.filter(function(x){return x._i===nipEdit;})[0]; if(r)for(var k in rec)r[k]=rec[k]; }
-  else { rec._i=REP.length?Math.max.apply(null,REP.map(function(x){return x._i;}))+1:0; REP.unshift(rec); }
-  var after=function(msg){ closeNippou(); renderNippou(); renderDash(); renderAnken(); renderCalendar(); buildFilters(); toast(msg); };
+  else { rec._i=REP.length?Math.max.apply(null,REP.map(function(x){return x._i;}))+1:0; REP.unshift(rec); if(DATA.reports) DATA.reports.unshift(rec); }  // 遅延読込のrebuildREPで消えないようDATA側にも追加
+  var after=function(msg){ closeNippou(); renderNippou(); renderDash(); renderAnken(); renderCalendar(); buildFilters(); try{cacheSave();}catch(e){} toast(msg); };
   if(USING_SAMPLE){ after("（サンプル表示中：画面のみ）"); return; }
   $("nippouSaveBtn").disabled=true; $("nippouSaveBtn").textContent="保存中…";
   var ok=function(msg){ $("nippouSaveBtn").disabled=false; $("nippouSaveBtn").textContent="日報を保存"; after(msg); };
@@ -1282,7 +1310,8 @@ function deleteNippou(){
   if(nipEdit<0)return; if(!confirm("この日報を削除しますか？"))return;
   var r=REP.filter(function(x){return x._i===nipEdit;})[0];
   REP=REP.filter(function(x){return x._i!==nipEdit;});
-  var after=function(msg){ closeNippou(); renderNippou(); renderDash(); renderAnken(); renderCalendar(); buildFilters(); toast(msg); };
+  if(r && DATA.reports){ DATA.reports=DATA.reports.filter(function(x){ return x!==r && (!r._id || String(x._id)!==String(r._id)); }); }  // 遅延読込のrebuildREPで復活しないようDATA側からも削除
+  var after=function(msg){ closeNippou(); renderNippou(); renderDash(); renderAnken(); renderCalendar(); buildFilters(); try{cacheSave();}catch(e){} toast(msg); };
   if(USING_SAMPLE){ after("（サンプル表示中：画面のみ削除）"); return; }
   if(r && r._id){ gasCall("deleteNippou",[r._id]).then(function(){ after("✓ 日報を削除しました"); }).catch(function(e){ after("⚠ 削除エラー："+((e&&e.message)||e)); }); }
   else { after("✓ 日報を削除しました（未保存のため画面のみ）"); }
@@ -1420,8 +1449,10 @@ function dstr(dt){ return dt.getFullYear()+"-"+("0"+(dt.getMonth()+1)).slice(-2)
 function ymd(y,m,d){ return y+"-"+("0"+(m+1)).slice(-2)+"-"+("0"+d).slice(-2); }
 function isBizDay(y,m,d){ var wd=new Date(y,m,d).getDay(); return wd>=1 && wd<=5; }
 function calInit(){ var d=new Date(); calYM={y:d.getFullYear(),m:d.getMonth()}; }
-function calShift(delta){ if(!calYM)calInit(); var m=calYM.m+delta,y=calYM.y; while(m<0){m+=12;y--;} while(m>11){m-=12;y++;} calYM={y:y,m:m}; renderCalendar(); }
-function calToday(){ calInit(); renderCalendar(); }
+function calShift(delta){ if(!calYM)calInit(); var m=calYM.m+delta,y=calYM.y; while(m<0){m+=12;y--;} while(m>11){m-=12;y++;} calYM={y:y,m:m}; ensureReportsFrom(_calMonthStart(), renderCalendar); }
+function calToday(){ calInit(); ensureReportsFrom(_calMonthStart(), renderCalendar); }
+/* 日報の期間フィルタ（開始日）を変えたら、その日まで遡って確保してから表示 */
+function onNipFrom(){ var f=$("nFrom")?$("nFrom").value:""; if(f){ ensureReportsFrom(f, renderNippou); } else { renderNippou(); } }
 function calRoster(){
   // 日報必須の人だけ（未提出カレンダーの対象）。未設定は必須扱い
   var names=(typeof MEMBERS!=="undefined"?MEMBERS:[]).filter(function(m){return m.need!==false;}).map(function(m){return String(m.name||"").trim();}).filter(Boolean);
@@ -1883,7 +1914,10 @@ document.querySelectorAll(".rail .ri").forEach(function(n){n.onclick=function(){
   document.querySelectorAll(".view").forEach(function(s){s.classList.toggle("on",s.id==="v-"+v);});
   $("topttl").textContent=TITLE[v][0]; $("topsub").textContent=TITLE[v][1];
   $("main").scrollTop=0;
-  if(v==="bi"){ try{ renderBI(); }catch(e){} }
+  // 必要な期間の日報を確保してから描画（分析/自己分析=直近1年、カレンダー=表示月、報告書=直近1年）
+  if(v==="bi"){ ensureReportsFrom(ymdMinusDays(366), function(){ try{ renderBI(); }catch(e){} }); }
+  else if(v==="calendar"){ ensureReportsFrom(_calMonthStart(), function(){ try{ renderCalendar(); }catch(e){} }); }
+  else if(v==="report"){ ensureReportsFrom(ymdMinusDays(366), function(){ try{ renderReport(); }catch(e){} }); }
 };});
 document.querySelectorAll(".scrim").forEach(function(sc){ sc.addEventListener("click",function(e){ if(e.target===sc) sc.classList.remove("on"); }); });
 
@@ -1949,7 +1983,7 @@ function daySheetHtml(d){
 }
 function printDay(){
   var d=dayFilter();if(!d){alert("氏名と日付を選んでください");return;}
-  openPrint("営業日報 "+d.rep+" "+d.date, pg(daySheetHtml(d)), false, "A4");
+  ensureReportsFrom(d.date, function(){ var d2=dayFilter()||d; openPrint("営業日報 "+d2.rep+" "+d2.date, pg(daySheetHtml(d2)), false, "A4"); });  // その日の日報を確保してから印刷
 }
 /* 週の月曜を返す（月曜始まり） */
 function weekMonday(dateStr){
@@ -1964,11 +1998,13 @@ function printWeek(){
   var rep=$("pdRep")?$("pdRep").value:""; if(!rep){alert("氏名を選んでください");return;}
   var pick=($("pwDate")&&$("pwDate").value)?$("pwDate").value:todayStr();
   var mon=weekMonday(pick);
-  var pages=[];
-  for(var i=0;i<5;i++){ var dt=new Date(mon); dt.setDate(mon.getDate()+i); var ds=todayStr(dt);
-    pages.push(pg(daySheetHtml(dayFilterFor(rep, ds)))); }
-  var start=todayStr(mon), fri=(function(){var dt=new Date(mon);dt.setDate(mon.getDate()+4);return todayStr(dt);})();
-  openPrint("営業日報 "+rep+" "+start+"〜"+fri+"（月〜金）", pages.join(""), false, "A4");
+  ensureReportsFrom(todayStr(mon), function(){   // その週の日報を確保してから印刷
+    var pages=[];
+    for(var i=0;i<5;i++){ var dt=new Date(mon); dt.setDate(mon.getDate()+i); var ds=todayStr(dt);
+      pages.push(pg(daySheetHtml(dayFilterFor(rep, ds)))); }
+    var start=todayStr(mon), fri=(function(){var dt=new Date(mon);dt.setDate(mon.getDate()+4);return todayStr(dt);})();
+    openPrint("営業日報 "+rep+" "+start+"〜"+fri+"（月〜金）", pages.join(""), false, "A4");
+  });
 }
 /* 案件：工程会議資料（材料・工事別・A3） */
 function ankenSectionHtml(tp,rows,today){
