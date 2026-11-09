@@ -306,6 +306,39 @@ select.scell{cursor:pointer}
 .seg .segbtn{border:0;background:#fff;color:var(--sub);font:inherit;font-size:12.5px;font-weight:600;padding:6px 13px;cursor:pointer;border-left:1px solid var(--line);white-space:nowrap}
 .seg .segbtn:first-child{border-left:0}
 .seg .segbtn.on{background:var(--green);color:#fff}
+/* 自己分析（分析タブ内） */
+.jhero{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.jhero .big{font-size:32px;font-weight:900;line-height:1}
+.jhero .big small{font-size:14px;font-weight:700;color:var(--sub);margin-left:3px}
+.jhero .of{color:var(--sub);font-size:12px;font-weight:600;padding-bottom:5px}
+.jbadge{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:5px 11px;border-radius:999px;margin-left:auto}
+.jbadge.ok{background:var(--green-l);color:var(--green-d)} .jbadge.warn{background:#fdf0dd;color:var(--amber)} .jbadge.bad{background:#fbe6e3;color:var(--red)}
+.jpbar{height:13px;border-radius:999px;background:#eef1f3;overflow:hidden;margin-top:12px}
+.jpbar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--green),#2a8a69)}
+.jpf{display:flex;justify-content:space-between;color:var(--sub);font-size:11.5px;margin-top:7px;font-weight:600}
+.jpace{margin-top:11px;background:var(--bg);border-radius:10px;padding:10px 12px;font-size:12.5px;line-height:1.6}
+.jpace b{color:var(--green-d)}
+.jquick{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:11px;padding-bottom:11px;border-bottom:1px dashed var(--line)}
+.jquick input{font:inherit;font-weight:700;border:1.5px solid var(--line);border-radius:9px;padding:6px 10px;width:88px;text-align:right}
+.jquick input:focus{outline:none;border-color:var(--green)}
+.jquick button{font:inherit;font-size:12px;font-weight:700;color:var(--green-d);background:var(--green-l);border:1px solid #cfe6db;border-radius:9px;padding:7px 12px;cursor:pointer}
+.jmgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.jcell{background:var(--bg);border-radius:10px;padding:8px 9px}
+.jcell .ml{color:var(--sub);font-size:11px;font-weight:700;margin-bottom:3px}
+.jcell input{font:inherit;font-weight:700;font-size:14px;color:var(--ink);border:0;border-bottom:1.5px solid var(--line);background:transparent;width:100%;text-align:right;padding:1px 0}
+.jcell input:focus{outline:none;border-color:var(--green)}
+.jtot{color:var(--sub);font-size:12px;font-weight:600;margin-top:11px;text-align:right}
+.jtot b{color:var(--ink);font-size:14px}
+.jins{display:flex;gap:9px;align-items:flex-start;padding:9px 0;border-top:1px dashed #d5e8df;font-size:12.6px;line-height:1.6}
+.jins:first-child{border-top:0}
+.jins .ic{flex:none;width:21px;height:21px;border-radius:7px;display:grid;place-items:center;font-size:12px;font-weight:900;color:#fff}
+.jins .ic.up{background:var(--green)} .jins .ic.watch{background:var(--amber)} .jins .ic.todo{background:var(--blue)}
+.jins b{color:var(--green-d)}
+.jcum{display:flex;align-items:center;gap:10px;background:var(--bg);border-radius:10px;padding:10px 12px;margin-top:11px;font-size:12.5px;line-height:1.5}
+.jcum b{color:var(--ink)}
+.jtip{position:fixed;pointer-events:none;background:var(--ink);color:#fff;font-size:11px;font-weight:600;padding:5px 8px;border-radius:7px;white-space:nowrap;opacity:0;transform:translate(-50%,-6px);transition:opacity .1s;z-index:60}
+@media(max-width:560px){.jmgrid{grid-template-columns:repeat(3,1fr)}.jhero .big{font-size:28px}}
+@media(max-width:380px){.jmgrid{grid-template-columns:repeat(2,1fr)}}
 .callegend{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;font-size:11px;color:var(--sub)}
 .callegend span{display:inline-flex;align-items:center;gap:5px}
 .callegend i{width:12px;height:12px;border-radius:3px;display:inline-block}
@@ -1628,8 +1661,18 @@ function reportSubmit(){
 }
 /* ===== 分析（担当者別実績・月次推移・フォロー漏れ） ===== */
 function daysBetween(d1,d2){ try{ var a=new Date(d1+"T00:00:00"), b=new Date(d2+"T00:00:00"); return Math.round((b-a)/864e5); }catch(e){ return 0; } }
+var biView="self";
+function setBiView(v){ biView=v; renderBI(); }
 function renderBI(){
   var host=$("v-bi"); if(!host) return;
+  host.innerHTML='<div class="vh"><h2>分析</h2><span class="sub">自分の達成状況と、全体の集計</span></div>'
+    +'<div class="seg" style="margin:2px 0 6px"><button class="segbtn'+(biView==="self"?" on":"")+'" onclick="setBiView(\'self\')">自己分析（自分）</button><button class="segbtn'+(biView==="all"?" on":"")+'" onclick="setBiView(\'all\')">全体</button></div>'
+    +'<div id="biBody"></div>';
+  var body=$("biBody");
+  if(biView==="self"){ try{ renderBISelf(body); }catch(e){ body.innerHTML='<div class="card"><div class="empty">自己分析の表示でエラーが出ました</div></div>'; } }
+  else renderBIAll(body);
+}
+function renderBIAll(host){
   // 担当者別（日報=訪問/受注/粗利、案件=案件数/パイプライン/失注）
   var reps={};
   function rp(n){ n=String(n||"").trim(); if(!n) return null; return reps[n]||(reps[n]={name:n,visits:0,wonCnt:0,won:0,arari:0,ankenN:0,wonAnk:0,pipe:0,lost:0}); }
@@ -1666,12 +1709,162 @@ function renderBI(){
   var followTbl='<div class="card" style="padding:0;overflow-x:auto"><table style="min-width:620px"><thead><tr><th>顧客名</th><th>自社担当</th><th>先方の担当者</th><th style="text-align:right">最終訪問</th><th style="text-align:right">経過</th></tr></thead><tbody>'
     +(cs.length?cs.slice(0,100).map(function(c){var warn=c.daysSince>=90;return '<tr style="cursor:pointer" data-ck="'+aesc(c.key)+'"><td><b class="lnk">'+esc(c.name)+'</b></td><td>'+(c.mainRep?esc(c.mainRep):'—')+'</td><td>'+(c.contacts.length?esc(c.contacts.slice(0,2).join("・")):'—')+'</td><td style="text-align:right">'+esc(c.lastVisit)+'</td><td style="text-align:right'+(warn?';color:var(--red);font-weight:700':'')+'">'+c.daysSince+'日</td></tr>';}).join(""):'<tr><td colspan="5" class="empty">30日以上訪問していない顧客はいません</td></tr>')
     +'</tbody></table></div>';
-  host.innerHTML='<div class="vh"><h2>レポート・分析</h2><span class="sub">日報・案件から自動集計（受注額は日報の報告ベース）</span></div>'
+  host.innerHTML='<div class="sub" style="margin:2px 2px 10px">日報・案件から自動集計（受注額は日報の報告ベース）</div>'
     +'<h3 style="margin:4px 0 8px;font-size:13px">担当者別 実績</h3>'+repTbl
     +'<h3 style="margin:4px 0 8px;font-size:13px">種別別（工事 / 材料）</h3>'+typeTbl
     +monTbl
     +'<h3 style="margin:4px 0 8px;font-size:13px">フォロー漏れ（最終訪問から30日以上）</h3>'+followTbl;
   host.querySelectorAll("[data-ck]").forEach(function(el){ el.onclick=function(){ openCust(el.dataset.ck); }; });
+}
+
+/* ===== 自己分析（本人専用：月別目標 vs 実績） ===== */
+function jMan(n){ return Math.round(nn(n)/1e4); }
+function jManC(n){ return jMan(n).toLocaleString(); }
+function jDaysInMonth(ym){ var p=ym.split("-"); return new Date(+p[0],+p[1],0).getDate(); }
+function jLastMonths(n){ var arr=[],d=new Date(); for(var i=n-1;i>=0;i--){ var x=new Date(d.getFullYear(),d.getMonth()-i,1); arr.push(x.getFullYear()+"-"+("0"+(x.getMonth()+1)).slice(-2)); } return arr; }
+function jTgtKey(p){ return "eigyo_jibun_tgt_"+p; }
+function jLoadT(p){ try{ var v=JSON.parse(localStorage.getItem(jTgtKey(p))||"null"); if(v&&typeof v==="object")return v; }catch(e){} return {}; }
+function jSaveT(p,t){ try{ localStorage.setItem(jTgtKey(p),JSON.stringify(t)); }catch(e){} }
+
+function renderBISelf(host){
+  var P=(typeof curPerson==="function"?curPerson():ME)||"";
+  if(!P){ host.innerHTML='<div class="card"><div class="empty">ログインすると、自分の目標と実績がここに出ます。</div></div>'; return; }
+  var today=todayStr(), curYM=today.slice(0,7), curYear=curYM.slice(0,4);
+  var months=jLastMonths(12);
+  var byYm={}; REP.forEach(function(r){ if(String(r.rep||"").trim()!==P) return; var ym=String(r.date||"").slice(0,7); if(!/^\d{4}-\d{2}$/.test(ym))return; var o=byYm[ym]||(byYm[ym]={won:0,visits:0,wonCnt:0}); var k=nn(r.kettei); o.visits++; o.won+=k; if(k>0)o.wonCnt++; });
+  function mo(ym){ return byYm[ym]||{won:0,visits:0,wonCnt:0}; }
+  var pipe=0; ANK.forEach(function(a){ if(String(a.rep||"").trim()!==P)return; if(/営業中|見積提出中|施工予定|納入予定/.test(a.status)) pipe+=nn(a.amount); });
+  var T=jLoadT(P);
+  function tYen(ym){ return (nn(T[ym])||0)*1e4; }
+
+  host.innerHTML=''
+    +'<div class="sub" style="margin:2px 2px 10px">対象：<b>'+esc(P)+'</b> さん（日報・案件から自動集計）</div>'
+    +'<div class="card"><h3>📌 月別の売上目標 <span style="color:var(--sub);font-weight:500;font-size:11px;margin-left:auto">自分で設定・単位＝万円・この端末に保存</span></h3>'
+      +'<div class="jquick"><span class="sub" style="font-weight:600">まとめて</span><input id="bi_bulk" inputmode="numeric" placeholder="例 1000"><span class="sub" style="font-weight:600">万円</span><button id="bi_bulkBtn">全月に入れる</button><span class="sub">→ 繁忙期だけ個別に直せます</span></div>'
+      +'<div class="jmgrid" id="bi_mgrid"></div>'
+      +'<div class="jtot">年間目標 合計 <b id="bi_goalYear">—</b> 万円</div></div>'
+    +'<div class="card"><h3>今月の受注 <span style="color:var(--sub);font-weight:500;font-size:11px;margin-left:auto" id="bi_ymLabel"></span></h3>'
+      +'<div class="jhero"><div class="big" id="bi_moWon">—</div><div class="of" id="bi_moGoal"></div><span class="jbadge" id="bi_moBadge"></span></div>'
+      +'<div class="jpbar"><i id="bi_moFill" style="width:0%"></i></div>'
+      +'<div class="jpf"><span id="bi_moRate"></span><span id="bi_moRemain"></span></div>'
+      +'<div class="jpace" id="bi_pace"></div></div>'
+    +'<div class="card" style="background:linear-gradient(180deg,#f3faf7,#fff);border-color:#cfe6db"><h3 style="color:var(--green-d)">💡 あなたの傾向・次の一手</h3><div id="bi_ins"></div></div>'
+    +'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px" id="bi_kpis"></div>'
+    +'<div class="card" style="margin-top:12px"><h3>月ごとの受注と目標 <span style="color:var(--sub);font-weight:500;font-size:11px;margin-left:auto">直近12か月・目標は月ごと</span></h3><div id="bi_chart" style="position:relative"></div>'
+      +'<div style="display:flex;gap:14px;align-items:center;color:var(--sub);font-size:11px;font-weight:600;margin-top:8px;flex-wrap:wrap"><span style="display:inline-flex;align-items:center;gap:5px"><span style="width:12px;height:12px;border-radius:3px;background:var(--green)"></span>受注額</span><span style="display:inline-flex;align-items:center;gap:5px"><span style="width:12px;height:12px;border-radius:3px;background:#8fc3ad"></span>今月(途中)</span><span style="display:inline-flex;align-items:center;gap:5px"><span style="width:16px;border-top:2px dashed var(--sub)"></span>その月の目標</span></div></div>'
+    +'<div class="card"><h3>今年の累計 <span style="color:var(--sub);font-weight:500;font-size:11px;margin-left:auto">'+curYear+'年</span></h3>'
+      +'<div class="jhero"><div class="big" id="bi_yWon">—</div><div class="of" id="bi_yGoal"></div><span class="jbadge" id="bi_yBadge"></span></div>'
+      +'<div class="jpbar"><i id="bi_yFill" style="width:0%"></i></div>'
+      +'<div class="jpf"><span id="bi_yRate"></span><span id="bi_yRemain"></span></div>'
+      +'<div class="jcum"><span class="sub" style="font-weight:600;flex:none">今月までの<br>目標ペース</span><span id="bi_cumText"></span></div></div>';
+
+  function buildGrid(){
+    var g=$("bi_mgrid"); g.innerHTML="";
+    months.forEach(function(ym){
+      var mm=+ym.split("-")[1];
+      var c=document.createElement("div"); c.className="jcell";
+      c.innerHTML='<div class="ml">'+mm+'月</div><div style="display:flex;align-items:baseline;gap:3px"><input inputmode="numeric" data-ym="'+ym+'"><span class="sub" style="font-size:10px;font-weight:600">万</span></div>';
+      g.appendChild(c);
+    });
+    g.querySelectorAll("input").forEach(function(inp){
+      var ym=inp.dataset.ym, n=nn(T[ym]); inp.value=n?n.toLocaleString():"";
+      inp.addEventListener("focus",function(){ inp.value=String(nn(inp.value)||""); });
+      inp.addEventListener("input",function(){ T[ym]=nn(inp.value); jSaveT(P,T); update(); });
+      inp.addEventListener("blur",function(){ var v=nn(inp.value); inp.value=v?v.toLocaleString():""; });
+    });
+  }
+  $("bi_bulkBtn").onclick=function(){ var n=nn($("bi_bulk").value); if(n<=0){ try{toast("まとめて入れる金額（万円）を入力してください");}catch(e){} return; } months.forEach(function(ym){ T[ym]=n; }); jSaveT(P,T); buildGrid(); update(); };
+
+  function update(){
+    var cur=mo(curYM), moWon=cur.won, moGoal=tYen(curYM);
+    var dayElapsed=+today.slice(8,10), dayTotal=jDaysInMonth(curYM);
+    $("bi_ymLabel").textContent=(+curYear)+"年"+(+curYM.slice(5,7))+"月";
+    $("bi_moWon").innerHTML=jManC(moWon)+'<small>万円</small>';
+    $("bi_moGoal").textContent="／ 今月の目標 "+jManC(moGoal)+"万円";
+    var rate=moGoal?Math.round(moWon/moGoal*100):0;
+    $("bi_moFill").style.width=Math.min(100,rate)+"%";
+    $("bi_moRate").textContent="達成率 "+rate+"%";
+    var remain=Math.max(0,moGoal-moWon);
+    $("bi_moRemain").textContent=moGoal<=0?"目標 未設定":(remain>0?("残り "+jManC(remain)+"万円"):"目標達成 🎉");
+    var pace=$("bi_pace"), badge=$("bi_moBadge"), proj=0, projRate=0;
+    if(moGoal>0 && dayElapsed>0 && dayElapsed<dayTotal){
+      proj=Math.round(moWon*dayTotal/dayElapsed); projRate=Math.round(proj/moGoal*100);
+      var gap=Math.max(0,moGoal-moWon), daysLeft=dayTotal-dayElapsed;
+      pace.style.display=""; pace.innerHTML="今のペースだと、月末の着地は <b>約"+jManC(proj)+"万円（達成率"+projRate+"%）</b>。"+(gap>0?("あと <b>"+jManC(gap)+"万円</b> で今月の目標に届きます。"):"このままなら<b>達成の見込み</b>です。");
+      badge.className="jbadge "+(projRate>=100?"ok":projRate>=85?"warn":"bad"); badge.textContent=projRate>=100?"達成ペース":projRate>=85?"ペース要注意":"ペース未達";
+    } else {
+      pace.style.display="none";
+      badge.className="jbadge "+(rate>=100?"ok":rate>=85?"warn":"bad"); badge.textContent=moGoal<=0?"目標未設定":(rate>=100?"達成":rate>=85?"あと少し":"未達");
+    }
+    var wr=cur.visits?Math.round(cur.wonCnt/cur.visits*100):0;
+    $("bi_kpis").innerHTML=
+       '<div class="kpi"><div class="l">今月の訪問</div><div class="v">'+cur.visits+'<small style="font-size:12px"> 件</small></div><div class="d">日報の件数</div></div>'
+      +'<div class="kpi"><div class="l">今月の受注</div><div class="v">'+cur.wonCnt+'<small style="font-size:12px"> 件</small></div><div class="d">受注を報告した日報</div></div>'
+      +'<div class="kpi"><div class="l">受注率</div><div class="v">'+wr+'<small style="font-size:12px"> %</small></div><div class="d">受注 ÷ 訪問</div></div>'
+      +'<div class="kpi"><div class="l">見込（進行中）</div><div class="v">'+jManC(pipe)+'<small style="font-size:12px"> 万</small></div><div class="d">自分の案件</div></div>';
+    var yKeys=Object.keys(byYm).filter(function(k){return k.slice(0,4)===curYear;});
+    var yWon=yKeys.reduce(function(s,k){return s+byYm[k].won;},0);
+    var goalYear=Object.keys(T).filter(function(k){return k.slice(0,4)===curYear;}).reduce(function(s,k){return s+(nn(T[k])||0)*1e4;},0);
+    $("bi_goalYear").textContent=jManC(goalYear);
+    $("bi_yWon").innerHTML=jManC(yWon)+'<small>万円</small>';
+    $("bi_yGoal").textContent="／ 年間目標 "+jManC(goalYear)+"万円";
+    var yr=goalYear?Math.round(yWon/goalYear*100):0;
+    $("bi_yFill").style.width=Math.min(100,yr)+"%";
+    $("bi_yRate").textContent="達成率 "+yr+"%";
+    var yRem=Math.max(0,goalYear-yWon);
+    $("bi_yRemain").textContent=goalYear<=0?"目標 未設定":(yRem>0?("残り "+jManC(yRem)+"万円"):"目標達成 🎉");
+    $("bi_yBadge").className="jbadge "+(yr>=100?"ok":yr>=75?"warn":"bad"); $("bi_yBadge").textContent=goalYear<=0?"—":(yr>=100?"達成":yr>=75?"順調":"要追い上げ");
+    var doneKeys=yKeys.filter(function(k){return k<curYM;}).sort();
+    var cumGoal=doneKeys.reduce(function(s,k){return s+tYen(k);},0), cumWon=doneKeys.reduce(function(s,k){return s+byYm[k].won;},0);
+    var diff=cumWon-cumGoal, lastDone=doneKeys.length?((+doneKeys[doneKeys.length-1].slice(5,7))+"月"):"";
+    $("bi_cumText").innerHTML=(doneKeys.length?(lastDone+"まで"):"まだ実績なし")+"：目標 <b>"+jManC(cumGoal)+"万</b> ／ 実績 <b>"+jManC(cumWon)+"万</b>　"+'<span style="color:'+(diff>=0?"var(--green-d)":"var(--red)")+';font-weight:700">'+(diff>=0?"＋":"−")+jManC(Math.abs(diff))+"万（"+(diff>=0?"先行":"遅れ")+"）</span>";
+    renderJInsight({moWon:moWon,moGoal:moGoal,rate:rate,proj:proj,projRate:projRate,dayElapsed:dayElapsed,dayTotal:dayTotal,visits:cur.visits,wonCnt:cur.wonCnt,wr:wr,pipe:pipe,byYm:byYm,curYM:curYM,cumDiff:diff,doneKeys:doneKeys});
+    drawJChart(months,byYm,curYM,tYen);
+  }
+
+  buildGrid(); update();
+}
+
+function renderJInsight(d){
+  var box=$("bi_ins"); if(!box)return;
+  var done=d.doneKeys.map(function(k){return d.byYm[k].won;});
+  var avg=done.length?Math.round(done.reduce(function(s,x){return s+x;},0)/done.length):0;
+  var items=[];
+  if(d.moGoal>0 && d.dayElapsed>0 && d.dayElapsed<d.dayTotal){
+    if(d.projRate>=100) items.push(["up","今月は<b>目標達成ペース</b>（着地見込 約"+jManC(d.proj)+"万）。この調子で。"]);
+    else { var gap=Math.max(0,d.moGoal-d.moWon), dl=d.dayTotal-d.dayElapsed; items.push(["watch","今月は目標ペースに<b>未達</b>（着地見込 約"+jManC(d.proj)+"万・"+d.projRate+"%）。残り"+dl+"日で あと<b>"+jManC(gap)+"万</b> 必要。"]); }
+  }
+  if(d.wr>=30 && d.visits<25 && d.visits>0) items.push(["todo","<b>決める力が高い</b>（受注率"+d.wr+"%）。訪問は今"+d.visits+"件 → <b>訪問を増やすほど受注が伸びる</b>タイプ。"]);
+  else if(d.visits>0 && d.wr<20) items.push(["watch","受注率が低め（"+d.wr+"%）。商談の数より<b>質・クロージング</b>の見直しが効きそう。"]);
+  else if(avg>0 && d.pipe>=avg*2 && d.wonCnt<=3) items.push(["todo","見込（進行中 "+jManC(d.pipe)+"万）は十分。あとは<b>決め切り（クロージング）</b>が鍵。"]);
+  if(avg>0){ var base=(d.dayElapsed>0&&d.dayElapsed<d.dayTotal&&d.proj>0)?d.proj:d.moWon; if(base>=avg*1.1) items.push(["up","今月の着地見込は自分の平均（"+jManC(avg)+"万）より<b>上</b>。"]); else if(base<avg*0.9) items.push(["watch","今月の着地見込は自分の平均（"+jManC(avg)+"万）より<b>下</b>。"]); }
+  if(d.doneKeys.length){ if(d.cumDiff>=0) items.push(["up","累計は目標を <b>＋"+jManC(d.cumDiff)+"万 先行</b>。良いペースです。"]); else items.push(["watch","累計で <b>−"+jManC(Math.abs(d.cumDiff))+"万 の遅れ</b>。来月以降で取り返す計画を。"]); }
+  if(!items.length) items.push(["todo","目標を入れると、ここに毎月の気づき（強み・次の一手）が出ます。"]);
+  box.innerHTML=items.slice(0,3).map(function(it){ var mk=it[0]==="up"?"↑":(it[0]==="watch"?"!":"→"); return '<div class="jins"><span class="ic '+it[0]+'">'+mk+'</span><div>'+it[1]+'</div></div>'; }).join("");
+}
+
+function drawJChart(months,byYm,curYM,tYen){
+  var host=$("bi_chart"); if(!host)return;
+  var W=host.clientWidth||680,H=200,padT=12,padB=24,padL=4,padR=4,innerH=H-padT-padB,n=months.length,gap=7;
+  var bw=(W-padL-padR-gap*(n-1))/n;
+  function wonOf(ym){ return (byYm[ym]||{won:0}).won; }
+  var vals=months.map(wonOf).concat(months.map(tYen));
+  var maxV=Math.max.apply(null,vals.concat([1]))*1.12||1;
+  function y(v){ return padT+innerH-(v/maxV*innerH); }
+  var s='<svg viewBox="0 0 '+W+' '+H+'" width="100%" height="'+H+'" style="display:block">';
+  months.forEach(function(ym,i){ var won=wonOf(ym),x=padL+i*(bw+gap),yy=y(won),bh=Math.max(2,padT+innerH-yy),partial=(ym===curYM);
+    s+='<rect class="jbar" data-ym="'+ym+'" x="'+x.toFixed(1)+'" y="'+yy.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+bh.toFixed(1)+'" rx="4" fill="'+(partial?"#8fc3ad":"var(--green)")+'"/>';
+    s+='<text x="'+(x+bw/2).toFixed(1)+'" y="'+(H-8)+'" text-anchor="middle" font-size="10" fill="#707a82" font-weight="'+(partial?700:500)+'">'+(+ym.slice(5,7))+'月</text>';
+  });
+  months.forEach(function(ym,i){ var tg=tYen(ym); if(tg<=0)return; var x=padL+i*(bw+gap),gy=y(tg); s+='<line x1="'+(x-2).toFixed(1)+'" y1="'+gy.toFixed(1)+'" x2="'+(x+bw+2).toFixed(1)+'" y2="'+gy.toFixed(1)+'" stroke="#48525a" stroke-width="2" stroke-dasharray="4 3"/>'; });
+  s+='</svg>';
+  host.innerHTML=s;
+  var tip=$("bi_tip")||(function(){ var t=document.createElement("div"); t.id="bi_tip"; t.className="jtip"; document.body.appendChild(t); return t; })();
+  host.querySelectorAll(".jbar").forEach(function(r){
+    r.addEventListener("mouseenter",function(ev){ var ym=r.dataset.ym,won=wonOf(ym),tg=tYen(ym),rt=tg?Math.round(won/tg*100):0; tip.innerHTML=(+ym.slice(0,4))+"年"+(+ym.slice(5,7))+"月"+(ym===curYM?"（途中）":"")+"<br><b>受注 "+jManC(won)+"万</b> ／ 目標 "+jManC(tg)+"万（"+rt+"%）"; tip.style.opacity="1"; mv(ev); });
+    r.addEventListener("mousemove",mv); r.addEventListener("mouseleave",function(){ tip.style.opacity="0"; });
+  });
+  function mv(ev){ tip.style.left=ev.clientX+"px"; tip.style.top=(ev.clientY-8)+"px"; }
 }
 $("v-estimate").innerHTML=estimateHtml();
 document.querySelectorAll(".rail .ri").forEach(function(n){n.onclick=function(){
@@ -1682,6 +1875,7 @@ document.querySelectorAll(".rail .ri").forEach(function(n){n.onclick=function(){
   document.querySelectorAll(".view").forEach(function(s){s.classList.toggle("on",s.id==="v-"+v);});
   $("topttl").textContent=TITLE[v][0]; $("topsub").textContent=TITLE[v][1];
   $("main").scrollTop=0;
+  if(v==="bi"){ try{ renderBI(); }catch(e){} }
 };});
 document.querySelectorAll(".scrim").forEach(function(sc){ sc.addEventListener("click",function(e){ if(e.target===sc) sc.classList.remove("on"); }); });
 
@@ -2085,7 +2279,7 @@ function applyDeepLink(){
   var ri=document.querySelector('.rail .ri[data-v="'+v+'"]'); if(ri) ri.click();
   if(v==="nippou"){ try{ openNippou(); }catch(e){} }
 }
-function afterLoginUi(){ VIEW_AS=""; try{ applyAdminGate(); }catch(e){} try{ renderDash(); if($("calTarget")){ fillCalTarget(); if(calRoster().indexOf(ME)>=0) $("calTarget").value=ME; renderCalendar(); } if($("nFilterRep")){ $("nFilterRep").value=ME||""; renderNippou(); } if($("kFilterRep")) $("kFilterRep").value=""; try{ ankTabSet("mine"); }catch(e){} renderAnken(); try{initReportView();}catch(e){} applyDeepLink(); }catch(e){} }
+function afterLoginUi(){ VIEW_AS=""; try{ applyAdminGate(); }catch(e){} try{ renderDash(); if($("calTarget")){ fillCalTarget(); if(calRoster().indexOf(ME)>=0) $("calTarget").value=ME; renderCalendar(); } if($("nFilterRep")){ $("nFilterRep").value=ME||""; renderNippou(); } if($("kFilterRep")) $("kFilterRep").value=""; try{ ankTabSet("mine"); }catch(e){} renderAnken(); try{initReportView();}catch(e){} try{ renderBI(); }catch(e){} applyDeepLink(); }catch(e){} }
 /* 管理者メニューの出し分け：管理者LINE IDのみ表示。非管理者が管理者画面にいたらダッシュへ戻す */
 function applyAdminGate(){
   var show=isAdmin();
@@ -2116,6 +2310,7 @@ function setViewAs(v){
 function refreshPersonViews(){
   var p=curPerson();
   try{ if($("nFilterRep")){ $("nFilterRep").value=p||""; renderNippou(); } }catch(e){}
+  try{ renderBI(); }catch(e){}
   try{ if($("kFilterRep")) $("kFilterRep").value=""; ankTabSet("mine"); renderAnken(); }catch(e){}
   try{ if($("calTarget")){ fillCalTarget(); var r=(typeof calRoster==="function"?calRoster():[]); $("calTarget").value=(r.indexOf(p)>=0?p:"__all__"); renderCalendar(); } }catch(e){}
   try{ if($("rpRep")){ var o=[].slice.call($("rpRep").options).map(function(x){return x.value;}); if(o.indexOf(p)>=0) $("rpRep").value=p; renderReport(); } }catch(e){}
